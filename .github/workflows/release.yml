@@ -3,7 +3,7 @@ name: Build & Release
 on:
   push:
     tags:
-      - 'v*'   # push a tag like v1.0.0.2 to trigger a release
+      - 'v*'   # push a tag like v1.0.0.4 to trigger a release
 
 permissions:
   contents: write   # needed to create the GitHub Release
@@ -32,18 +32,34 @@ jobs:
       - name: Build
         run: dotnet build VenueHelper/VenueHelper.csproj -c Release --no-restore
 
-      # DalamudPackager (bundled with Dalamud.NET.Sdk) produces a clean plugin
-      # zip during the build. Find it wherever it landed and copy it out as
-      # VenueHelper.zip so the release asset name is stable.
-      - name: Locate packaged zip
-        id: findzip
+      # Trim native runtimes the game never uses. FFXIV + Dalamud are always
+      # Windows x64, so QuestPDF's Linux/macOS/win-x86 native libs are dead
+      # weight (~57MB). Keep only runtimes/win-x64.
+      - name: Trim unused runtimes
         run: |
-          $zip = Get-ChildItem -Path VenueHelper/bin/Release -Recurse -Filter *.zip |
-                 Where-Object { $_.Name -ne 'VenueHelper.zip' } |
-                 Select-Object -First 1
-          if (-not $zip) { Write-Error "No packaged zip found - DalamudPackager may not have run."; exit 1 }
-          Copy-Item $zip.FullName -Destination VenueHelper/bin/Release/VenueHelper.zip -Force
-          Write-Host "Packaged zip: $($zip.FullName)"
+          $rt = "VenueHelper/bin/Release/runtimes"
+          if (Test-Path $rt) {
+            Get-ChildItem $rt -Directory |
+              Where-Object { $_.Name -ne 'win-x64' } |
+              Remove-Item -Recurse -Force
+            Write-Host "Kept only win-x64. Remaining runtimes:"
+            Get-ChildItem $rt -Directory | ForEach-Object { Write-Host "  $($_.Name)" }
+          } else {
+            Write-Host "No runtimes folder found; nothing to trim."
+          }
+        shell: pwsh
+
+      # Repackage into a clean zip after trimming. DalamudPackager's own zip is
+      # made during build (before trimming), so we build our own from the
+      # trimmed output instead, excluding the .pdb debug symbols.
+      - name: Package
+        run: |
+          $out = "VenueHelper/bin/Release"
+          Get-ChildItem $out -Filter *.zip | Remove-Item -Force
+          Get-ChildItem $out -Filter *.pdb | Remove-Item -Force
+          Compress-Archive -Path "$out/*" -DestinationPath "$out/VenueHelper.zip" -Force
+          $size = (Get-Item "$out/VenueHelper.zip").Length / 1MB
+          Write-Host ("Final zip size: {0:N1} MB" -f $size)
         shell: pwsh
 
       - name: Create Release
