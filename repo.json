@@ -1,0 +1,19 @@
+[
+  {
+    "Author": "Akari",
+    "Name": "Venue Helper",
+    "Punchline": "Attendance counting, raffles, auctions, and giveaways for venue hosts.",
+    "Description": "An all-in-one venue host toolkit: Venue Counter, Raffle Helper, Auction Helper, and Giveaway Helper. Open with /venuehelper (aliases /vhelp, /vh). Exports to TXT, CSV, PDF, or XLSX.",
+    "InternalName": "VenueHelper",
+    "AssemblyVersion": "1.0.0.0",
+    "TestingAssemblyVersion": "1.0.0.0",
+    "RepoUrl": "https://github.com/YOURNAME/VenueHelper",
+    "ApplicableVersion": "any",
+    "DalamudApiLevel": 12,
+    "Tags": ["venue", "counter", "attendance", "raffle", "auction", "giveaway", "tracker", "host"],
+    "IconUrl": "https://raw.githubusercontent.com/YOURNAME/VenueHelper/main/images/icon.png",
+    "DownloadLinkInstall": "https://github.com/YOURNAME/VenueHelper/releases/latest/download/VenueHelper.zip",
+    "DownloadLinkUpdate": "https://github.com/YOURNAME/VenueHelper/releases/latest/download/VenueHelper.zip",
+    "DownloadLinkTesting": "https://github.com/YOURNAME/VenueHelper/releases/latest/download/VenueHelper.zip"
+  }
+]
