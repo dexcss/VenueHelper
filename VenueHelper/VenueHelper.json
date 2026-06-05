@@ -7,7 +7,7 @@
   "AssemblyVersion": "1.0.0.0",
   "RepoUrl": "https://github.com/dexcss/VenueHelper",
   "ApplicableVersion": "any",
-  "DalamudApiLevel": 12,
+  "DalamudApiLevel": 15,
   "Tags": ["venue", "counter", "attendance", "raffle", "auction", "giveaway", "tracker", "host"],
   "IconUrl": "https://raw.githubusercontent.com/dexcss/VenueHelper/main/images/icon.png"
 }
