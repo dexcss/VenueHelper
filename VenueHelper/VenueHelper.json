@@ -4,7 +4,7 @@
   "Punchline": "Attendance counting, raffles, auctions, and giveaways for venue hosts.",
   "Description": "An all-in-one venue host toolkit.\n\n- Venue Counter: a temporary lap counter (run the venue to catch everyone past the 99-render cap) and an all-night counter, runnable at the same time.\n- Raffle Helper: tracks ticket buy-ins by name and world, auto-detects incoming trade gil, assigns ticket numbers 1-999, and exports (including one-line-per-ticket for wheelofnames.com).\n- Auction Helper: target a player to add them to an auction list, note what they're auctioning, record the final sale, apply a configurable house cut %, and export. Includes a history tab with totals.\n- Giveaway Helper: start a round and capture each player's FIRST /random, then highlight the highest, lowest, and/or closest-to-target roll. Shows every roll for verification.\n\nExports can be written as TXT, CSV, PDF, or XLSX to a folder you choose.\n\nUsage:\n- /venuehelper (aliases /vhelp, /vh) to open the window.",
   "InternalName": "VenueHelper",
-  "AssemblyVersion": "1.0.0.4",
+  "AssemblyVersion": "1.0.0.5",
   "RepoUrl": "https://github.com/dexcss/VenueHelper",
   "ApplicableVersion": "any",
   "DalamudApiLevel": 15,

@@ -3,7 +3,7 @@
     <PropertyGroup>
         <Authors>Akari</Authors>
         <AssemblyName>VenueHelper</AssemblyName>
-        <Version>1.0.0.4</Version>
+        <Version>1.0.0.5</Version>
         <Description>Venue operations toolkit: counts attendance, runs raffles, and runs self-auctions from one window.</Description>
     </PropertyGroup>
 
