@@ -3,7 +3,7 @@ name: Build & Release
 on:
   push:
     tags:
-      - 'v*'   # e.g. push tag v1.0.0.0 to trigger a release
+      - 'v*'   # push a tag like v1.0.0.2 to trigger a release
 
 permissions:
   contents: write   # needed to create the GitHub Release
@@ -18,7 +18,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: '10.0.x'
 
       - name: Download Dalamud
         run: |
@@ -32,10 +32,18 @@ jobs:
       - name: Build
         run: dotnet build VenueHelper/VenueHelper.csproj -c Release --no-restore
 
-      - name: Package
+      # DalamudPackager (bundled with Dalamud.NET.Sdk) produces a clean plugin
+      # zip during the build. Find it wherever it landed and copy it out as
+      # VenueHelper.zip so the release asset name is stable.
+      - name: Locate packaged zip
+        id: findzip
         run: |
-          $version = "${{ github.ref_name }}".TrimStart('v')
-          Compress-Archive -Path VenueHelper/bin/Release/* -DestinationPath VenueHelper/bin/Release/VenueHelper.zip -Force
+          $zip = Get-ChildItem -Path VenueHelper/bin/Release -Recurse -Filter *.zip |
+                 Where-Object { $_.Name -ne 'VenueHelper.zip' } |
+                 Select-Object -First 1
+          if (-not $zip) { Write-Error "No packaged zip found - DalamudPackager may not have run."; exit 1 }
+          Copy-Item $zip.FullName -Destination VenueHelper/bin/Release/VenueHelper.zip -Force
+          Write-Host "Packaged zip: $($zip.FullName)"
         shell: pwsh
 
       - name: Create Release
