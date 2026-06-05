@@ -7,13 +7,13 @@
     "InternalName": "VenueHelper",
     "AssemblyVersion": "1.0.0.0",
     "TestingAssemblyVersion": "1.0.0.0",
-    "RepoUrl": "https://github.com/YOURNAME/VenueHelper",
+    "RepoUrl": "https://github.com/dexcss/VenueHelper",
     "ApplicableVersion": "any",
     "DalamudApiLevel": 12,
     "Tags": ["venue", "counter", "attendance", "raffle", "auction", "giveaway", "tracker", "host"],
-    "IconUrl": "https://raw.githubusercontent.com/YOURNAME/VenueHelper/main/images/icon.png",
-    "DownloadLinkInstall": "https://github.com/YOURNAME/VenueHelper/releases/latest/download/VenueHelper.zip",
-    "DownloadLinkUpdate": "https://github.com/YOURNAME/VenueHelper/releases/latest/download/VenueHelper.zip",
-    "DownloadLinkTesting": "https://github.com/YOURNAME/VenueHelper/releases/latest/download/VenueHelper.zip"
+    "IconUrl": "https://raw.githubusercontent.com/dexcss/VenueHelper/main/images/icon.png",
+    "DownloadLinkInstall": "https://github.com/dexcss/VenueHelper/releases/latest/download/VenueHelper.zip",
+    "DownloadLinkUpdate": "https://github.com/dexcss/VenueHelper/releases/latest/download/VenueHelper.zip",
+    "DownloadLinkTesting": "https://github.com/dexcss/VenueHelper/releases/latest/download/VenueHelper.zip"
   }
 ]
