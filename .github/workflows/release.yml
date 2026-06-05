@@ -3,7 +3,7 @@ name: Build & Release
 on:
   push:
     tags:
-      - 'v*'   # push a tag like v1.0.0.4 to trigger a release
+      - 'v*'   # push a tag like v1.0.0.5 to trigger a release
 
 permissions:
   contents: write   # needed to create the GitHub Release
@@ -32,31 +32,39 @@ jobs:
       - name: Build
         run: dotnet build VenueHelper/VenueHelper.csproj -c Release --no-restore
 
-      # Trim native runtimes the game never uses. FFXIV + Dalamud are always
-      # Windows x64, so QuestPDF's Linux/macOS/win-x86 native libs are dead
-      # weight (~57MB). Keep only runtimes/win-x64.
-      - name: Trim unused runtimes
+      # Clean the build output down to just what ships:
+      #  - Drop DalamudPackager's own output folder (bin/Release/VenueHelper/),
+      #    which contains a full pre-trim latest.zip (~41MB) we don't want
+      #    nested inside our archive.
+      #  - Trim native runtimes to win-x64 only (FFXIV is always Windows x64);
+      #    the Linux/macOS/win-x86 QuestPDF natives are dead weight (~57MB).
+      #  - Drop debug symbols and any stray zips.
+      - name: Clean output
         run: |
-          $rt = "VenueHelper/bin/Release/runtimes"
+          $out = "VenueHelper/bin/Release"
+
+          # Remove DalamudPackager's packaged subfolder (named after the assembly).
+          $pkg = Join-Path $out "VenueHelper"
+          if (Test-Path $pkg) { Remove-Item $pkg -Recurse -Force; Write-Host "Removed nested packager folder." }
+
+          # Trim runtimes to win-x64 only.
+          $rt = Join-Path $out "runtimes"
           if (Test-Path $rt) {
-            Get-ChildItem $rt -Directory |
-              Where-Object { $_.Name -ne 'win-x64' } |
-              Remove-Item -Recurse -Force
-            Write-Host "Kept only win-x64. Remaining runtimes:"
-            Get-ChildItem $rt -Directory | ForEach-Object { Write-Host "  $($_.Name)" }
-          } else {
-            Write-Host "No runtimes folder found; nothing to trim."
+            Get-ChildItem $rt -Directory | Where-Object { $_.Name -ne 'win-x64' } | Remove-Item -Recurse -Force
+            Write-Host "Trimmed runtimes to win-x64."
           }
+
+          # Drop debug symbols and any leftover zips.
+          Get-ChildItem $out -Filter *.pdb | Remove-Item -Force
+          Get-ChildItem $out -Filter *.zip | Remove-Item -Force
+
+          Write-Host "Remaining top-level items:"
+          Get-ChildItem $out | ForEach-Object { Write-Host "  $($_.Name)" }
         shell: pwsh
 
-      # Repackage into a clean zip after trimming. DalamudPackager's own zip is
-      # made during build (before trimming), so we build our own from the
-      # trimmed output instead, excluding the .pdb debug symbols.
       - name: Package
         run: |
           $out = "VenueHelper/bin/Release"
-          Get-ChildItem $out -Filter *.zip | Remove-Item -Force
-          Get-ChildItem $out -Filter *.pdb | Remove-Item -Force
           Compress-Archive -Path "$out/*" -DestinationPath "$out/VenueHelper.zip" -Force
           $size = (Get-Item "$out/VenueHelper.zip").Length / 1MB
           Write-Host ("Final zip size: {0:N1} MB" -f $size)
