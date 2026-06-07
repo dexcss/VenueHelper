@@ -32,6 +32,7 @@ public sealed class Plugin : IDalamudPlugin
     public RaffleService Raffle { get; init; }
     public AuctionService Auction { get; init; }
     public GiveawayTracker Giveaway { get; init; }
+    public DeathrollManager Deathroll { get; init; }
     public TradeWatcher TradeWatcher { get; init; }
     public HookManager HookManager { get; init; }
 
@@ -53,6 +54,7 @@ public sealed class Plugin : IDalamudPlugin
         Raffle = new RaffleService(this);
         Auction = new AuctionService(this);
         Giveaway = new GiveawayTracker(this);
+        Deathroll = new DeathrollManager(this);
         TradeWatcher = new TradeWatcher(this);
         HookManager = new HookManager(this);
 

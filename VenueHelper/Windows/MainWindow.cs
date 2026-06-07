@@ -18,6 +18,11 @@ public partial class MainWindow : Window, IDisposable
     internal static readonly Vector4 Blue = new(0.50f, 0.75f, 1.0f, 1.0f);
     internal static readonly Vector4 Grey = new(0.6f, 0.6f, 0.6f, 1.0f);
 
+    // Scales a fixed pixel width by Dalamud's global UI scale so inputs (and the
+    // +/- buttons ImGui draws inside InputInt/InputFloat) don't clip or overflow
+    // at high-DPI / high-scale setups like 4K at 230%.
+    internal static float SW(float width) => width * ImGuiHelpers.GlobalScale;
+
     // Transient status line shown per tab.
     private string statusMessage = string.Empty;
     private Vector4 statusColor = Grey;
@@ -58,6 +63,11 @@ public partial class MainWindow : Window, IDisposable
             if (ImGui.BeginTabItem("Giveaway Helper"))
             {
                 DrawGiveawayTab();
+                ImGui.EndTabItem();
+            }
+            if (ImGui.BeginTabItem("DR Tourny Helper"))
+            {
+                DrawDeathrollTab();
                 ImGui.EndTabItem();
             }
             ImGui.EndTabBar();
@@ -135,7 +145,7 @@ public partial class MainWindow : Window, IDisposable
             ImGui.Separator();
 
             ImGui.TextColored(Grey, "Format");
-            ImGui.SetNextItemWidth(220);
+            ImGui.SetNextItemWidth(SW(220));
             if (ImGui.BeginCombo($"##fmt_{popupId}", exportFormat.Label()))
             {
                 foreach (ExportFormat f in Enum.GetValues<ExportFormat>())
@@ -147,7 +157,7 @@ public partial class MainWindow : Window, IDisposable
             ImGuiHelpers.ScaledDummy(4f);
 
             ImGui.TextColored(Grey, "Destination folder");
-            ImGui.SetNextItemWidth(360);
+            ImGui.SetNextItemWidth(SW(360));
             if (ImGui.InputTextWithHint($"##dir_{popupId}", "Blank = default plugin folder", ref exportDirInput, 512))
             {
                 Config.ExportDirectory = exportDirInput.Trim();

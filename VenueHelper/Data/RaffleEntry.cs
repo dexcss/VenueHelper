@@ -1,8 +1,7 @@
 namespace VenueHelper.Data;
 
-// One raffle participant: their identity, total gil paid in, and the ticket
-// numbers assigned to them. Tickets are computed from gil paid divided by the
-// configured ticket cost, but can also be added manually.
+// One raffle participant: identity, how many tickets they bought, an optional
+// note (e.g. Discord handle), and the ticket numbers assigned to them.
 [Serializable]
 public class RaffleEntry
 {
@@ -10,13 +9,14 @@ public class RaffleEntry
     // otherwise just the bare name.
     public string FullName = string.Empty;
 
-    // Total gil this player has paid in toward raffle tickets.
-    public long GilPaid;
+    // Tickets this player bought (entered directly by the host).
+    public int Tickets;
 
-    // Tickets bought manually (added on top of whatever gil/cost computes).
-    public int ManualTickets;
+    // Free-form note (Discord name, etc.). Not included in external/wheel export.
+    public string Note = string.Empty;
 
-    // Assigned raffle numbers (1-999). Empty until the host assigns them.
+    // Assigned raffle numbers (0-999). Empty until assigned, or left empty if
+    // the draw overflowed past 999 (host uses wheelofnames instead).
     public List<int> TicketNumbers = new();
 
     public DateTime FirstSeen = DateTime.Now;
@@ -47,13 +47,7 @@ public class RaffleEntry
         }
     }
 
-    // "Name@World" for display and CSV.
     public string DisplayName => FullName.Replace('\uE05D', '@');
 
-    // Number of tickets a given gil amount buys, plus any manual tickets.
-    public int TicketCount(long ticketCost)
-    {
-        var fromGil = ticketCost <= 0 ? 0 : (int)(GilPaid / ticketCost);
-        return fromGil + ManualTickets;
-    }
+    public int TicketCount => Math.Max(0, Tickets);
 }

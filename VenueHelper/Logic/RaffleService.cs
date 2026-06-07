@@ -10,21 +10,24 @@ public class RaffleService
     public RaffleService(Plugin plugin) => Plugin = plugin;
 
     public List<RaffleEntry> Entries => Config.RaffleEntries;
-    public long TicketCost => Config.TicketCost;
+
+    // House cut percent for raffles (whole-number percent), e.g. 20 for an 80/20.
+    public float HouseCutPercent => Config.RaffleHouseCutPercent;
+    public void SetHouseCut(float pct)
+    {
+        Config.RaffleHouseCutPercent = (float)Math.Round(Math.Clamp(pct, 0f, 100f));
+        Config.Save();
+    }
 
     // ---- Entry management ----------------------------------------------
 
-    // Find an entry by full name, matching on bare name if the world tag differs
-    // (trades sometimes arrive without a world).
     public RaffleEntry? Find(string fullName)
     {
         if (string.IsNullOrWhiteSpace(fullName))
             return null;
-
         var direct = Config.RaffleEntries.FirstOrDefault(e => e.FullName == fullName);
         if (direct != null)
             return direct;
-
         var bare = StripWorld(fullName);
         return Config.RaffleEntries.FirstOrDefault(e => StripWorld(e.FullName) == bare);
     }
@@ -34,45 +37,57 @@ public class RaffleService
         var existing = Find(fullName);
         if (existing != null)
         {
-            // Upgrade a bare-name entry to a full Name@World one if we learn the world.
             if (!existing.FullName.Contains('\uE05D') && fullName.Contains('\uE05D'))
                 existing.FullName = fullName;
             return existing;
         }
-
         var entry = new RaffleEntry(fullName);
         Config.RaffleEntries.Add(entry);
         Config.Save();
         return entry;
     }
 
-    // Add a player by typed "Name@World" or by the world-glyph form.
     public RaffleEntry AddManual(string name)
     {
         var normalized = name.Trim().Replace('@', '\uE05D');
         return GetOrCreate(normalized);
     }
 
-    public void CreditGil(string fullName, long gil)
+    // Add (or subtract) tickets for a player. Tickets never go below 0 \u2014 and
+    // since tickets are a single manual number now, the minus button can always
+    // walk it all the way back down to 0 (no hidden floor).
+    public void AddTickets(RaffleEntry entry, int delta)
     {
-        if (gil <= 0)
-            return;
-        var entry = GetOrCreate(fullName);
-        entry.GilPaid += gil;
+        entry.Tickets = Math.Max(0, entry.Tickets + delta);
         Config.Save();
     }
 
-    public void SetGil(string fullName, long gil)
+    public void SetTickets(RaffleEntry entry, int count)
     {
-        var entry = GetOrCreate(fullName);
-        entry.GilPaid = Math.Max(0, gil);
+        entry.Tickets = Math.Max(0, count);
         Config.Save();
     }
 
-    public void AddManualTickets(RaffleEntry entry, int count)
+    // Bulk-add a list of names (from a pasted clipboard list, comma/newline
+    // separated). Returns how many were newly added.
+    public int ImportNames(string raw)
     {
-        entry.ManualTickets = Math.Max(0, entry.ManualTickets + count);
-        Config.Save();
+        if (string.IsNullOrWhiteSpace(raw)) return 0;
+        var parts = raw.Split(new[] { '\n', '\r', ',', ';', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+        var added = 0;
+        foreach (var p in parts)
+        {
+            var name = p.Trim();
+            if (name.Length == 0) continue;
+            var normalized = name.Replace('@', '\uE05D');
+            if (Find(normalized) == null)
+            {
+                Config.RaffleEntries.Add(new RaffleEntry(normalized));
+                added++;
+            }
+        }
+        if (added > 0) Config.Save();
+        return added;
     }
 
     public void Remove(RaffleEntry entry)
@@ -87,49 +102,47 @@ public class RaffleService
         Config.Save();
     }
 
-    public void SetTicketCost(long cost)
-    {
-        Config.TicketCost = Math.Max(1, cost);
-        Config.Save();
-    }
-
     // ---- Ticket number assignment --------------------------------------
 
-    public int TotalTickets => Config.RaffleEntries.Sum(e => e.TicketCount(Config.TicketCost));
+    public int TotalTickets => Config.RaffleEntries.Sum(e => e.TicketCount);
 
-    // Assign sequential numbers starting at 1, in current list order, giving
-    // each player a contiguous block sized to their ticket count. Caps at 999.
+    // Assign numbers starting at 0 in list order, each player getting a
+    // contiguous block. If the total exceeds 1000 (0-999), numbers are left
+    // blank and the host is told to use wheelofnames instead.
     public (bool ok, string message) AssignSequential()
     {
         var total = TotalTickets;
         if (total == 0)
             return (false, "No tickets to assign. Add buy-ins first.");
-        if (total > 999)
-            return (false, $"{total} tickets exceeds the 1-999 range. Reduce buy-ins or raise the ticket cost.");
+        if (total > 1000)
+        {
+            ClearNumbers();
+            return (false, $"{total} tickets exceeds 0-999. Numbers left blank \u2014 use the external wheel (wheelofnames) for the draw.");
+        }
 
-        var next = 1;
+        var next = 0;
         foreach (var e in Config.RaffleEntries)
         {
-            var count = e.TicketCount(Config.TicketCost);
             e.TicketNumbers = new List<int>();
-            for (var i = 0; i < count; i++)
+            for (var i = 0; i < e.TicketCount; i++)
                 e.TicketNumbers.Add(next++);
         }
         Config.Save();
-        return (true, $"Assigned numbers 1-{next - 1} across {Config.RaffleEntries.Count} players.");
+        return (true, $"Assigned numbers 0-{next - 1} across {Config.RaffleEntries.Count} players.");
     }
 
-    // Assign numbers 1..total randomly shuffled, then hand out blocks in list
-    // order. Each player still gets a set of unique numbers, just not contiguous.
     public (bool ok, string message) AssignShuffled()
     {
         var total = TotalTickets;
         if (total == 0)
             return (false, "No tickets to assign. Add buy-ins first.");
-        if (total > 999)
-            return (false, $"{total} tickets exceeds the 1-999 range. Reduce buy-ins or raise the ticket cost.");
+        if (total > 1000)
+        {
+            ClearNumbers();
+            return (false, $"{total} tickets exceeds 0-999. Numbers left blank \u2014 use the external wheel (wheelofnames) for the draw.");
+        }
 
-        var pool = Enumerable.Range(1, total).ToList();
+        var pool = Enumerable.Range(0, total).ToList();
         var rng = new Random();
         for (var i = pool.Count - 1; i > 0; i--)
         {
@@ -140,14 +153,13 @@ public class RaffleService
         var idx = 0;
         foreach (var e in Config.RaffleEntries)
         {
-            var count = e.TicketCount(Config.TicketCost);
             e.TicketNumbers = new List<int>();
-            for (var i = 0; i < count; i++)
+            for (var i = 0; i < e.TicketCount; i++)
                 e.TicketNumbers.Add(pool[idx++]);
             e.TicketNumbers.Sort();
         }
         Config.Save();
-        return (true, $"Randomly assigned {total} ticket numbers.");
+        return (true, $"Randomly assigned {total} ticket numbers (0-{total - 1}).");
     }
 
     public void ClearNumbers()

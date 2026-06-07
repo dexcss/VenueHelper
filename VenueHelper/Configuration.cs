@@ -23,16 +23,20 @@ public class Configuration : IPluginConfiguration
 
     // ---- Raffle Helper -------------------------------------------------
     public List<RaffleEntry> RaffleEntries = new();
-    // Gil cost of a single ticket. Buy-ins divide by this to compute ticket count.
+    // Gil cost of a single ticket (used when auto-crediting detected trades).
     public long TicketCost = 100000;
-    // When a trade is detected, auto-credit it to the raffle as a buy-in.
+    // When a trade is detected, auto-credit it to the raffle as tickets.
     public bool RaffleAutoTrade = true;
+    // House cut percent for raffles (e.g. 20 for an 80/20 split). Whole numbers.
+    public float RaffleHouseCutPercent = 0f;
 
     // ---- Auction Helper ------------------------------------------------
     public List<AuctionEntry> AuctionEntries = new();
     public List<AuctionRecord> AuctionHistory = new();
     // Percentage the house keeps from each sale (0-100).
     public float HouseCutPercent = 0f;
+    // Tracked buyers and their aliases (for "how much did X spend" across alts).
+    public List<BuyerProfile> Buyers = new();
 
     // ---- Giveaway Helper -----------------------------------------------
     // Persisted so a crash mid-giveaway doesn't lose the rolls. Cleared only
@@ -47,6 +51,15 @@ public class Configuration : IPluginConfiguration
     public int GiveawayMatchTarget = 777;
     // Set to the winning roll's Id when an exact-match race is won.
     public string GiveawayMatchWinnerId = string.Empty;
+
+    // ---- Deathroll Helper ----------------------------------------------
+    public List<DeathrollPlayer> DeathrollPlayers = new();
+    public List<DeathrollMatch> DeathrollMatches = new();
+    public bool DeathrollBuilt = false;
+    public int DeathrollKind = 0; // 0 = single elim, 1 = double elim
+    public string DeathrollActiveMatch = string.Empty;
+    // Roll-off range to decide who goes first. 0 = plain /random (0-999).
+    public int DeathrollRolloffValue = 0;
 
     [NonSerialized] private IDalamudPluginInterface? pluginInterface;
 

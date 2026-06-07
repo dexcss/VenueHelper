@@ -49,15 +49,19 @@ public class AuctionService
     public void Save() => Config.Save();
 
     // Move a finished entry into history, snapshotting the current house cut %.
+    // A sale price of 0 is rejected, but negatives are allowed: a negative price
+    // means the item was sold TO the house (the house pays out), which takes no
+    // house cut.
     public (bool ok, string message) Finalize(AuctionEntry entry)
     {
-        if (entry.SalePrice <= 0)
-            return (false, "Set a sale price greater than 0 before finalizing.");
+        if (entry.SalePrice == 0)
+            return (false, "Set a sale price before finalizing (use a negative price for a sale to the house).");
 
         Config.AuctionHistory.Add(new AuctionRecord(entry, Config.HouseCutPercent));
         Config.AuctionEntries.Remove(entry);
         Config.Save();
-        return (true, $"Recorded {entry.NameOnly} sold for {entry.SalePrice:N0} gil.");
+        var verb = entry.SalePrice < 0 ? "sold to house for" : "sold for";
+        return (true, $"Recorded {entry.NameOnly} {verb} {entry.SalePrice:N0} gil.");
     }
 
     public void RemoveHistory(AuctionRecord record)
@@ -72,9 +76,74 @@ public class AuctionService
         Config.Save();
     }
 
+    // History filtered to an optional inclusive date range (by sale date). Null
+    // bounds mean unbounded on that side.
+    public List<AuctionRecord> HistoryBetween(DateTime? from, DateTime? to)
+    {
+        IEnumerable<AuctionRecord> q = Config.AuctionHistory;
+        if (from.HasValue) q = q.Where(r => r.When.Date >= from.Value.Date);
+        if (to.HasValue) q = q.Where(r => r.When.Date <= to.Value.Date);
+        return q.OrderByDescending(r => r.When).ToList();
+    }
+
     // ---- Totals --------------------------------------------------------
 
     public long TotalGilThroughHouse => Config.AuctionHistory.Sum(r => r.SalePrice);
     public long TotalHouseCut => Config.AuctionHistory.Sum(r => r.HouseCut);
     public long TotalPayouts => Config.AuctionHistory.Sum(r => r.Payout);
+
+    // ---- Buyer tracking (manual aliases) -------------------------------
+
+    public List<BuyerProfile> Buyers => Config.Buyers;
+
+    public BuyerProfile AddBuyer(string displayName)
+    {
+        var b = new BuyerProfile(displayName.Trim());
+        Config.Buyers.Add(b);
+        Config.Save();
+        return b;
+    }
+
+    public void RemoveBuyer(BuyerProfile b)
+    {
+        Config.Buyers.Remove(b);
+        Config.Save();
+    }
+
+    public void AddAlias(BuyerProfile b, string alias)
+    {
+        alias = alias.Trim();
+        if (alias.Length == 0) return;
+        if (!b.Aliases.Any(a => a.Equals(alias, StringComparison.OrdinalIgnoreCase)))
+            b.Aliases.Add(alias);
+        Config.Save();
+    }
+
+    public void RemoveAlias(BuyerProfile b, string alias)
+    {
+        b.Aliases.RemoveAll(a => a.Equals(alias, StringComparison.OrdinalIgnoreCase));
+        Config.Save();
+    }
+
+    // Total a buyer spent across all their aliases (matched against the Winner
+    // field of history records). Only positive sales count as spend.
+    public long SpendForBuyer(BuyerProfile b)
+    {
+        return Config.AuctionHistory
+            .Where(r => r.SalePrice > 0 && BuyerMatches(b, r.Winner))
+            .Sum(r => r.SalePrice);
+    }
+
+    public int PurchaseCountForBuyer(BuyerProfile b) =>
+        Config.AuctionHistory.Count(r => r.SalePrice > 0 && BuyerMatches(b, r.Winner));
+
+    private static bool BuyerMatches(BuyerProfile b, string winner)
+    {
+        if (string.IsNullOrWhiteSpace(winner)) return false;
+        var w = winner.Trim();
+        if (b.DisplayName.Equals(w, StringComparison.OrdinalIgnoreCase)) return true;
+        return b.Aliases.Any(a =>
+            w.Equals(a, StringComparison.OrdinalIgnoreCase) ||
+            w.Contains(a, StringComparison.OrdinalIgnoreCase));
+    }
 }

@@ -57,6 +57,7 @@ public unsafe class HookManager
             var outOf = logMessageId == 3887 ? (*parameter)[2].IntValue : 0;
 
             Plugin.Giveaway.OnRoll(fullName, roll, outOf);
+            Plugin.Deathroll.OnRoll(fullName, roll, outOf);
         }
         catch (Exception ex)
         {
@@ -75,6 +76,7 @@ public unsafe class HookManager
             var fullName = $"{name}\uE05D{world.Name}";
 
             Plugin.Giveaway.OnRoll(fullName, roll, outOf);
+            Plugin.Deathroll.OnRoll(fullName, roll, outOf);
         }
         catch (Exception ex)
         {

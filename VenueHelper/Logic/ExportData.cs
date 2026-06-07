@@ -23,39 +23,33 @@ public static class ExportData
     // ---- Raffle --------------------------------------------------------
 
     // Summary: one row per player.
-    public static TableData RaffleSummary(IReadOnlyList<RaffleEntry> entries, long ticketCost)
+    public static TableData RaffleSummary(IReadOnlyList<RaffleEntry> entries)
     {
         var rows = entries.Select(e => (IReadOnlyList<string>)new List<string>
         {
             e.NameOnly ?? string.Empty,
             e.World ?? string.Empty,
-            e.GilPaid.ToString(),
-            e.TicketCount(ticketCost).ToString(),
+            e.TicketCount.ToString(),
+            e.Note ?? string.Empty,
             string.Join(" ", e.TicketNumbers),
         }).ToList();
 
         return new TableData("Raffle Summary",
-            new[] { "Name", "World", "GilPaid", "Tickets", "TicketNumbers" }, rows);
+            new[] { "Name", "World", "Tickets", "Note", "TicketNumbers" }, rows);
     }
 
     // One row PER TICKET, e.g. "Karin Vale (1)". Single column so the TXT export
     // is one clean line per ticket for wheelofnames.com.
-    public static TableData RaffleList(IReadOnlyList<RaffleEntry> entries, long ticketCost)
+    // External wheel list (wheelofnames): one row per ticket, NAME ONLY - never
+    // includes notes or world, so nothing private leaks to the website.
+    public static TableData RaffleList(IReadOnlyList<RaffleEntry> entries)
     {
         var rows = new List<IReadOnlyList<string>>();
         foreach (var e in entries)
         {
-            if (e.TicketNumbers.Count > 0)
-            {
-                foreach (var n in e.TicketNumbers)
-                    rows.Add(new List<string> { $"{e.NameOnly} ({n})" });
-            }
-            else
-            {
-                var count = e.TicketCount(ticketCost);
-                for (var i = 0; i < count; i++)
-                    rows.Add(new List<string> { e.NameOnly });
-            }
+            var count = e.TicketCount;
+            for (var i = 0; i < count; i++)
+                rows.Add(new List<string> { e.NameOnly });
         }
         return new TableData("Raffle Tickets", new[] { "Ticket" }, rows);
     }

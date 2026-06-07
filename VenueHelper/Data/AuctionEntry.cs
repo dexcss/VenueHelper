@@ -76,8 +76,9 @@ public class AuctionRecord
 
     public string DisplayName => FullName.Replace('\uE05D', '@');
 
-    // Gil the house keeps from this sale.
-    public long HouseCut => (long)Math.Round(SalePrice * (HouseCutPercent / 100.0));
+    // Gil the house keeps from this sale. Negative sales (sold TO the house,
+    // e.g. -200000) take no cut \u2014 the house is paying out, not earning.
+    public long HouseCut => SalePrice < 0 ? 0 : (long)Math.Round(SalePrice * (HouseCutPercent / 100.0));
 
     // Gil the seller takes home.
     public long Payout => SalePrice - HouseCut;

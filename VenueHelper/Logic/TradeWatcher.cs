@@ -114,9 +114,14 @@ public unsafe class TradeWatcher
 
     private void CreditTrade(string partner, uint gil)
     {
-        Plugin.Raffle.CreditGil(partner, gil);
-        var tickets = Plugin.Configuration.TicketCost > 0 ? gil / Plugin.Configuration.TicketCost : 0;
-        Plugin.Chat.Print($"[Venue Helper] Raffle: received {gil:N0} gil from {StripWorld(partner)} (\u2248 {tickets} tickets).");
+        var cost = Plugin.Configuration.TicketCost;
+        var tickets = cost > 0 ? (int)(gil / cost) : 0;
+        if (tickets > 0)
+        {
+            var entry = Plugin.Raffle.GetOrCreate(partner);
+            Plugin.Raffle.AddTickets(entry, tickets);
+        }
+        Plugin.Chat.Print($"[Venue Helper] Raffle: received {gil:N0} gil from {StripWorld(partner)} (\u2248 {tickets} ticket{(tickets == 1 ? "" : "s")}).");
     }
 
     private static string StripWorld(string full) => full.Replace("\uE05D", "\uE05D ");

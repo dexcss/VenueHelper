@@ -42,7 +42,7 @@ public partial class MainWindow
             ImGui.SameLine(0, 16);
             ImGui.TextColored(Grey, "Target");
             ImGui.SameLine();
-            ImGui.SetNextItemWidth(100);
+            ImGui.SetNextItemWidth(SW(140));
             var mt = Give.MatchTarget;
             if (ImGui.InputInt("##matchtarget", ref mt, 1, 10))
                 Give.MatchTarget = mt;
@@ -65,7 +65,7 @@ public partial class MainWindow
             if (ImGui.Checkbox("Closest to", ref closest))
                 Give.Modes = closest ? Give.Modes | GiveawayMode.Closest : Give.Modes & ~GiveawayMode.Closest;
             ImGui.SameLine();
-            ImGui.SetNextItemWidth(90);
+            ImGui.SetNextItemWidth(SW(140));
             var target = Give.ClosestTarget;
             if (ImGui.InputInt("##closesttarget", ref target, 1, 10))
                 Give.ClosestTarget = target;
