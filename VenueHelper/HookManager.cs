@@ -58,6 +58,7 @@ public unsafe class HookManager
 
             Plugin.Giveaway.OnRoll(fullName, roll, outOf);
             Plugin.Deathroll.OnRoll(fullName, roll, outOf);
+            Plugin.BarGames.OnRoll(fullName, roll, outOf);
         }
         catch (Exception ex)
         {
@@ -77,6 +78,7 @@ public unsafe class HookManager
 
             Plugin.Giveaway.OnRoll(fullName, roll, outOf);
             Plugin.Deathroll.OnRoll(fullName, roll, outOf);
+            Plugin.BarGames.OnRoll(fullName, roll, outOf);
         }
         catch (Exception ex)
         {

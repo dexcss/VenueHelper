@@ -28,6 +28,28 @@ public class AuctionService
         return entry;
     }
 
+    // Bulk-add names from a pasted clipboard list (comma/newline/semicolon/tab
+    // separated). Each becomes an auction entry with no note. Returns count added.
+    public int ImportNames(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return 0;
+        var parts = raw.Split(new[] { '\n', '\r', ',', ';', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+        var added = 0;
+        foreach (var p in parts)
+        {
+            var name = p.Trim();
+            if (name.Length == 0) continue;
+            var normalized = name.Replace('@', '\uE05D');
+            if (!Config.AuctionEntries.Any(e => e.FullName == normalized))
+            {
+                Config.AuctionEntries.Add(new AuctionEntry(normalized, string.Empty));
+                added++;
+            }
+        }
+        if (added > 0) Config.Save();
+        return added;
+    }
+
     public void Remove(AuctionEntry entry)
     {
         Config.AuctionEntries.Remove(entry);

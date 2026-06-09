@@ -117,6 +117,16 @@ public partial class MainWindow
                 auctionManualName = string.Empty;
             }
         }
+        ImGui.SameLine();
+        if (ImGui.Button("Import list from clipboard"))
+        {
+            var clip = ImGui.GetClipboardText() ?? string.Empty;
+            var added = Auction.ImportNames(clip);
+            SetStatus(added > 0 ? $"Imported {added} name(s) from clipboard." : "No new names found in clipboard.",
+                added > 0 ? Green : Red);
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Paste names from a spreadsheet (comma or newline separated), then click to add them all.");
 
         // Reset Active List, right-aligned.
         ImGui.SameLine();

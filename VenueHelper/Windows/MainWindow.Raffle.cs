@@ -28,6 +28,16 @@ public partial class MainWindow
                 () => ExportData.RaffleSummary(Raffle.Entries)));
         ImGui.TextColored(Grey, "Enter how many tickets each player bought, then assign 0-999 for the draw.");
 
+        // Warn if a bar game is currently capturing trades \u2014 they'd be taken as
+        // bar-game buy-ins instead of raffle tickets.
+        var activeGame = Plugin.BarGames.ActiveTrackingGame;
+        if (activeGame != null)
+        {
+            ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + SW(560));
+            ImGui.TextColored(Red, $"Heads up: the Bar Game \"{activeGame.Name}\" is capturing trades right now, so incoming trades will count as its buy-ins, NOT raffle tickets. Stop that game's capture before running a trade-based raffle.");
+            ImGui.PopTextWrapPos();
+        }
+
         ImGuiHelpers.ScaledDummy(6f);
 
         // ---- Settings -------------------------------------------------
@@ -61,18 +71,21 @@ public partial class MainWindow
 
         // ---- Add a buy-in ---------------------------------------------
         ImGui.TextColored(Blue, "Add a buy-in");
-        if (ImGui.Button("Add Targeted Player"))
+        if (ImGui.Button("Fill from Target"))
         {
             var target = Plugin.GetTargetName();
             if (string.IsNullOrEmpty(target))
                 SetStatus("No player targeted.", Red);
             else
             {
-                var entry = Raffle.GetOrCreate(target);
-                if (raffleManualTickets > 0) Raffle.AddTickets(entry, raffleManualTickets);
-                SetStatus($"Added {entry.NameOnly} with {raffleManualTickets} ticket(s).", Green);
+                // Put their Name@World into the box; the host then chooses
+                // Add Tickets or Add Free Ticket.
+                raffleManualName = target.Replace('\uE05D', '@');
+                SetStatus($"Filled in {VenueHelper.Logic.VenueCounter.NameOnly(target)} \u2014 now pick Add Tickets or Add Free Ticket.", Green);
             }
         }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Fills the name box with your current target. Then set the ticket count and click Add Tickets (or Add Free Ticket).");
         ImGui.SameLine(0, 16);
         ImGui.SetNextItemWidth(SW(180));
         ImGui.InputTextWithHint("##rname", "Name@World", ref raffleManualName, 64);
@@ -97,6 +110,24 @@ public partial class MainWindow
                 raffleManualName = string.Empty;
             }
         }
+        ImGui.SameLine();
+        if (ImGui.Button("Add Free Ticket"))
+        {
+            if (string.IsNullOrWhiteSpace(raffleManualName))
+            {
+                SetStatus("Enter a Name@World first.", Red);
+            }
+            else
+            {
+                var entry = Raffle.AddManual(raffleManualName);
+                var n = Math.Max(1, raffleManualTickets);
+                Raffle.AddFreeTickets(entry, n);
+                SetStatus($"Added {n} FREE ticket(s) to {entry.NameOnly} (not added to pot).", Green);
+                raffleManualName = string.Empty;
+            }
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Adds comp tickets: the name goes into the draw but it doesn't count toward the pot.");
 
         // ---- Import list ----------------------------------------------
         ImGuiHelpers.ScaledDummy(4f);
@@ -163,8 +194,8 @@ public partial class MainWindow
             ImGui.EndPopup();
         }
 
-        // Pot summary using ticket cost + house cut.
-        var pot = (long)total * Config.TicketCost;
+        // Pot summary uses PAID tickets only (free/comp tickets don't add gil).
+        var pot = (long)Raffle.TotalPaidTickets * Config.TicketCost;
         if (pot > 0)
         {
             var cut = (long)(pot * Raffle.HouseCutPercent / 100f);
@@ -200,7 +231,7 @@ public partial class MainWindow
             ImGui.TableSetupScrollFreeze(0, 1);
             ImGui.TableSetupColumn("Player", ImGuiTableColumnFlags.WidthStretch, 1.8f);
             ImGui.TableSetupColumn("World", ImGuiTableColumnFlags.WidthStretch, 1.1f);
-            ImGui.TableSetupColumn("Tickets", ImGuiTableColumnFlags.WidthFixed, SW(130));
+            ImGui.TableSetupColumn("Tickets", ImGuiTableColumnFlags.WidthFixed, SW(210));
             ImGui.TableSetupColumn("Note", ImGuiTableColumnFlags.WidthStretch, 1.6f);
             ImGui.TableSetupColumn("Numbers", ImGuiTableColumnFlags.WidthStretch, 1.8f);
             ImGui.TableSetupColumn("##del", ImGuiTableColumnFlags.WidthFixed, SW(28));
@@ -229,12 +260,20 @@ public partial class MainWindow
                 ImGui.TextColored(Grey, e.World);
 
                 // Tickets with +/- (no hidden floor; minus walks to 0).
+                // Shows paid count, plus free/comp count if any.
                 ImGui.TableNextColumn();
-                ImGui.TextColored(e.TicketCount > 0 ? Green : Grey, e.TicketCount.ToString());
+                ImGui.TextColored(e.PaidTickets > 0 ? Green : Grey, e.PaidTickets.ToString());
                 ImGui.SameLine();
                 if (ImGui.SmallButton("+")) Raffle.AddTickets(e, 1);
                 ImGui.SameLine();
                 if (ImGui.SmallButton("-")) Raffle.AddTickets(e, -1);
+                if (e.FreeTickets > 0)
+                {
+                    ImGui.SameLine();
+                    ImGui.TextColored(Blue, $"+{e.FreeTickets} free");
+                    ImGui.SameLine();
+                    if (ImGui.SmallButton("-##free")) Raffle.AddFreeTickets(e, -1);
+                }
 
                 // Editable note.
                 ImGui.TableNextColumn();

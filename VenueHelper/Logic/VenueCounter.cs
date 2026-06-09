@@ -1,5 +1,6 @@
 using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.SubKinds;
+using VenueHelper.Data;
 
 namespace VenueHelper.Logic;
 
@@ -18,6 +19,48 @@ public unsafe class VenueCounter
 {
     private readonly Plugin Plugin;
     private Configuration Config => Plugin.Configuration;
+    private VenueProfile Venue => Config.ActiveVenueProfile;
+
+    // ---- Venue profiles ------------------------------------------------
+
+    public IReadOnlyList<VenueProfile> Venues => Config.Venues;
+    public int ActiveVenueIndex => Config.ActiveVenue;
+    public string ActiveVenueName => Venue.Name;
+
+    public void AddVenue(string name)
+    {
+        Config.Venues.Add(new VenueProfile(string.IsNullOrWhiteSpace(name) ? "New Venue" : name.Trim()));
+        Config.ActiveVenue = Config.Venues.Count - 1;
+        Config.Save();
+    }
+
+    public void SwitchVenue(int index)
+    {
+        if (index < 0 || index >= Config.Venues.Count) return;
+        // Close any open sessions on the venue we're leaving so its data is tidy.
+        CloseAllOpenSessions();
+        Config.ActiveVenue = index;
+        Config.Save();
+    }
+
+    public void RenameVenue(VenueProfile v, string name)
+    {
+        v.Name = string.IsNullOrWhiteSpace(name) ? v.Name : name.Trim();
+        Config.Save();
+    }
+
+    public void RemoveVenue(VenueProfile v)
+    {
+        // Never leave zero venues.
+        if (Config.Venues.Count <= 1) return;
+        var idx = Config.Venues.IndexOf(v);
+        Config.Venues.Remove(v);
+        if (Config.ActiveVenue >= Config.Venues.Count)
+            Config.ActiveVenue = Config.Venues.Count - 1;
+        else if (idx <= Config.ActiveVenue && Config.ActiveVenue > 0)
+            Config.ActiveVenue--;
+        Config.Save();
+    }
 
     // Temporary lap counter state (not persisted - it's meant to be short-lived).
     public bool TempRunning { get; private set; }
@@ -34,18 +77,80 @@ public unsafe class VenueCounter
     private DateTime lastScan = DateTime.MinValue;
     private static readonly TimeSpan ScanInterval = TimeSpan.FromMilliseconds(1000);
 
+    // Visit-session tracking: last time each player was actually seen, used to
+    // decide when an open session should be closed. Players flicker out of
+    // render range, so a departure only counts after a grace period.
+    private readonly Dictionary<string, DateTime> lastSeenAt = new();
+    private static readonly TimeSpan DepartureGrace = TimeSpan.FromMinutes(30);
+
     public VenueCounter(Plugin plugin)
     {
         Plugin = plugin;
     }
 
     public bool AllNightRunning => Config.AllNightRunning;
-    public int AllNightTotal => Config.AllNightSeen.Count;
-    public DateTime AllNightStarted => Config.AllNightStarted;
+    public int AllNightTotal => Venue.AllNightSeen.Count;
+    public DateTime AllNightStarted => Venue.AllNightStarted;
     public int TempTotal => TempRunning ? TempSeen.Count : LastLapTotal;
 
     // The unique visitors gathered tonight (Name\uE05DWorld keys), for export.
-    public IReadOnlyCollection<string> AllNightVisitors => Config.AllNightSeen;
+    public IReadOnlyCollection<string> AllNightVisitors => Venue.AllNightSeen;
+
+    // ---- Lifetime time tracking ----------------------------------------
+
+    public bool TrackVisitTime
+    {
+        get => Config.TrackVisitTime;
+        set { Config.TrackVisitTime = value; Config.Save(); }
+    }
+
+    // Players and their total seconds, highest first.
+    public IEnumerable<(string Key, long Seconds)> VisitTimes =>
+        Venue.VisitSeconds.Select(kv => (Key: kv.Key, Seconds: kv.Value)).OrderByDescending(x => x.Seconds);
+
+    public void ResetVisitTimes()
+    {
+        Venue.VisitSeconds.Clear();
+        Venue.VisitSessions.Clear();
+        lastSeenAt.Clear();
+        Config.Save();
+    }
+
+    public void RemoveVisitTime(string key)
+    {
+        Venue.VisitSeconds.Remove(key);
+        Venue.VisitSessions.Remove(key);
+        lastSeenAt.Remove(key);
+        Config.Save();
+    }
+
+    // Visit sessions for one player, most recent first.
+    public IReadOnlyList<VisitSession> SessionsFor(string key) =>
+        Venue.VisitSessions.TryGetValue(key, out var s)
+            ? s.OrderByDescending(x => x.Arrived).ToList()
+            : new List<VisitSession>();
+
+    // "21H 31M" style. Seconds shown only under a minute.
+    public static string FormatDuration(long seconds)
+    {
+        if (seconds < 60) return $"{seconds}s";
+        var h = seconds / 3600;
+        var m = (seconds % 3600) / 60;
+        if (h > 0) return $"{h}H {m}M";
+        return $"{m}M";
+    }
+
+    public static string NameOnly(string key)
+    {
+        var idx = key.IndexOf('\uE05D');
+        return idx < 0 ? key : key[..idx];
+    }
+
+    public static string WorldOf(string key)
+    {
+        var idx = key.IndexOf('\uE05D');
+        return idx < 0 ? string.Empty : key[(idx + 1)..];
+    }
 
     // ---- Temporary lap counter -----------------------------------------
 
@@ -74,8 +179,8 @@ public unsafe class VenueCounter
     public void StartAllNight()
     {
         // Starting fresh resets the set and the start time.
-        Config.AllNightSeen.Clear();
-        Config.AllNightStarted = DateTime.Now;
+        Venue.AllNightSeen.Clear();
+        Venue.AllNightStarted = DateTime.Now;
         Config.AllNightRunning = true;
         Config.Save();
     }
@@ -90,13 +195,30 @@ public unsafe class VenueCounter
     public void StopAllNight()
     {
         Config.AllNightRunning = false;
+        CloseAllOpenSessions();
         Config.Save();
+    }
+
+    // Close any still-open visit sessions (e.g. when tracking stops) at their
+    // last-seen time, or now if never recorded.
+    private void CloseAllOpenSessions()
+    {
+        var now = DateTime.Now;
+        foreach (var kv in Venue.VisitSessions)
+        {
+            foreach (var s in kv.Value.Where(s => s.Open))
+            {
+                s.Left = lastSeenAt.TryGetValue(kv.Key, out var seen) ? seen : now;
+                s.Open = false;
+            }
+        }
+        lastSeenAt.Clear();
     }
 
     public void ResetAllNight()
     {
-        Config.AllNightSeen.Clear();
-        Config.AllNightStarted = DateTime.Now;
+        Venue.AllNightSeen.Clear();
+        Venue.AllNightStarted = DateTime.Now;
         Config.AllNightRunning = false;
         Config.Save();
     }
@@ -112,7 +234,14 @@ public unsafe class VenueCounter
 
         if (DateTime.Now - lastScan < ScanInterval)
             return;
+        // Real elapsed seconds since the last scan, credited to each visible
+        // player for lifetime time tracking. Clamp so a long pause (alt-tab,
+        // sleep) doesn't dump a huge chunk onto everyone currently visible.
+        var elapsed = lastScan == DateTime.MinValue ? 0 : (DateTime.Now - lastScan).TotalSeconds;
+        if (elapsed > 5) elapsed = 1; // treat gaps as a single interval
         lastScan = DateTime.Now;
+
+        var trackTime = Config.AllNightRunning && Config.TrackVisitTime && elapsed > 0;
 
         var visible = 0;
         var allNightDirty = false;
@@ -142,12 +271,61 @@ public unsafe class VenueCounter
 
             if (Config.AllNightRunning)
             {
-                if (Config.AllNightSeen.Add(key))
+                if (Venue.AllNightSeen.Add(key))
                     allNightDirty = true;
+            }
+
+            // Lifetime time: credit this player the elapsed interval.
+            if (trackTime)
+            {
+                Venue.VisitSeconds.TryGetValue(key, out var secs);
+                Venue.VisitSeconds[key] = secs + (long)Math.Round(elapsed);
+                allNightDirty = true;
+
+                // Visit sessions: open one if this player has no currently-open
+                // session, otherwise just refresh their last-seen time.
+                lastSeenAt[key] = DateTime.Now;
+                if (!Venue.VisitSessions.TryGetValue(key, out var sessions))
+                {
+                    sessions = new List<VisitSession>();
+                    Venue.VisitSessions[key] = sessions;
+                }
+                var open = sessions.LastOrDefault(s => s.Open);
+                if (open == null)
+                    sessions.Add(new VisitSession(DateTime.Now));
+                else
+                    open.LastSeen = DateTime.Now;
             }
         }
 
         CurrentlyVisible = visible;
+
+        // Close visit sessions for players not seen within the grace period
+        // (set their Left time to when they were last actually seen).
+        if (Config.AllNightRunning && Config.TrackVisitTime)
+        {
+            var now = DateTime.Now;
+            foreach (var kv in Venue.VisitSessions)
+            {
+                var open = kv.Value.LastOrDefault(s => s.Open);
+                if (open == null) continue;
+                if (lastSeenAt.TryGetValue(kv.Key, out var seen))
+                {
+                    if (now - seen > DepartureGrace)
+                    {
+                        open.Left = seen;     // they left when last actually seen
+                        open.Open = false;
+                        allNightDirty = true;
+                    }
+                }
+                else
+                {
+                    // No record of being seen this session run; close it now.
+                    open.Open = false;
+                    allNightDirty = true;
+                }
+            }
+        }
 
         // Persist the all-night set when it grew, so a crash/relog doesn't lose
         // the night's tally. Save only on change to avoid disk churn each second.

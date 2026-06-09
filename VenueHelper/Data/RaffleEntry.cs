@@ -9,8 +9,12 @@ public class RaffleEntry
     // otherwise just the bare name.
     public string FullName = string.Empty;
 
-    // Tickets this player bought (entered directly by the host).
+    // Tickets this player bought (counts toward the pot).
     public int Tickets;
+
+    // Free/comp tickets: added to the draw (name shows in the wheel) but do NOT
+    // count toward the pot value.
+    public int FreeTickets;
 
     // Free-form note (Discord name, etc.). Not included in external/wheel export.
     public string Note = string.Empty;
@@ -49,5 +53,10 @@ public class RaffleEntry
 
     public string DisplayName => FullName.Replace('\uE05D', '@');
 
-    public int TicketCount => Math.Max(0, Tickets);
+    // Total tickets in the draw (paid + free) \u2014 used for assigning numbers
+    // and building the wheel list.
+    public int TicketCount => Math.Max(0, Tickets) + Math.Max(0, FreeTickets);
+
+    // Paid tickets only \u2014 used for the pot value.
+    public int PaidTickets => Math.Max(0, Tickets);
 }

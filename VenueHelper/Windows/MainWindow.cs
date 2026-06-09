@@ -70,6 +70,16 @@ public partial class MainWindow : Window, IDisposable
                 DrawDeathrollTab();
                 ImGui.EndTabItem();
             }
+            if (ImGui.BeginTabItem("Shout/Yell Helper"))
+            {
+                DrawShoutTab();
+                ImGui.EndTabItem();
+            }
+            if (ImGui.BeginTabItem("Bar Game Helper"))
+            {
+                DrawBarGameTab();
+                ImGui.EndTabItem();
+            }
             ImGui.EndTabBar();
         }
     }

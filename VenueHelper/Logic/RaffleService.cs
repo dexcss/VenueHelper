@@ -68,6 +68,14 @@ public class RaffleService
         Config.Save();
     }
 
+    // Add (or remove) free/comp tickets \u2014 they enter the draw but don't add
+    // to the pot.
+    public void AddFreeTickets(RaffleEntry entry, int delta)
+    {
+        entry.FreeTickets = Math.Max(0, entry.FreeTickets + delta);
+        Config.Save();
+    }
+
     // Bulk-add a list of names (from a pasted clipboard list, comma/newline
     // separated). Returns how many were newly added.
     public int ImportNames(string raw)
@@ -105,6 +113,13 @@ public class RaffleService
     // ---- Ticket number assignment --------------------------------------
 
     public int TotalTickets => Config.RaffleEntries.Sum(e => e.TicketCount);
+    // Paid tickets only (for the pot value).
+    public int TotalPaidTickets => Config.RaffleEntries.Sum(e => e.PaidTickets);
+
+    // The raffle is "claiming trades" when auto-credit is on and it has entries
+    // (i.e. a raffle is in progress). Used to warn against running a bar game's
+    // trade capture at the same time, since both can't take trades at once.
+    public bool IsClaimingTrades => Config.RaffleAutoTrade && Config.RaffleEntries.Count > 0;
 
     // Assign numbers starting at 0 in list order, each player getting a
     // contiguous block. If the total exceeds 1000 (0-999), numbers are left

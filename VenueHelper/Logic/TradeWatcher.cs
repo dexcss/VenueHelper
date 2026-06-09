@@ -114,8 +114,19 @@ public unsafe class TradeWatcher
 
     private void CreditTrade(string partner, uint gil)
     {
-        var cost = Plugin.Configuration.TicketCost;
-        var tickets = cost > 0 ? (int)(gil / cost) : 0;
+        // If a bar game is actively tracking, the trade is a buy-in for it.
+        var activeGame = Plugin.BarGames.ActiveTrackingGame;
+        if (activeGame != null)
+        {
+            Plugin.BarGames.CreditTrade(partner, gil);
+            var cost = activeGame.EntryCost;
+            var plays = cost > 0 ? (int)(gil / cost) : 0;
+            Plugin.Chat.Print($"[Venue Helper] {activeGame.Name}: received {gil:N0} gil from {StripWorld(partner)} (\u2248 {plays} play{(plays == 1 ? "" : "s")}).");
+            return;
+        }
+
+        var ticketCost = Plugin.Configuration.TicketCost;
+        var tickets = ticketCost > 0 ? (int)(gil / ticketCost) : 0;
         if (tickets > 0)
         {
             var entry = Plugin.Raffle.GetOrCreate(partner);
