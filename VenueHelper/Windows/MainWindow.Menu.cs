@@ -297,7 +297,7 @@ public partial class MainWindow
                 Menu.Save();
             }
 
-            var childH = SW(110 + 30 * Math.Max(1, item.ServeSteps.Count) + 30);
+            var childH = SW(92 + 26 * Math.Max(1, item.ServeSteps.Count) + 16);
             if (ImGui.BeginChild($"##edit{i}", new Vector2(0, childH), true))
             {
                 var name = item.Name;
@@ -310,6 +310,8 @@ public partial class MainWindow
 
                 ImGui.TextColored(Grey, "Serve sequence \u2014 like a macro: each step is a command/emote, with a wait (seconds) after it. Plain text becomes /emote; anything starting with / (e.g. /say, /micon, /handover, /trade) is sent as-is.");
                 int? stepRemove = null;
+                ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(4f, 2f));
+                ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(6f, 3f));
                 for (var s = 0; s < item.ServeSteps.Count; s++)
                 {
                     var step = item.ServeSteps[s];
@@ -352,6 +354,7 @@ public partial class MainWindow
                     ImGui.PopID();
                 }
                 if (stepRemove != null) { item.ServeSteps.RemoveAt(stepRemove.Value); Menu.Save(); }
+                ImGui.PopStyleVar(2);
 
                 if (ImGui.SmallButton("+ Add step")) { item.ServeSteps.Add(new ServeStep(string.Empty, 1.0f)); Menu.Save(); }
                 ImGui.SameLine(0, 16);
@@ -468,7 +471,7 @@ public partial class MainWindow
         {
             var macro = Menu.Macros[mi];
             ImGui.PushID($"macro{mi}");
-            var childH = SW(70 + 30 * Math.Max(1, macro.Steps.Count) + 30);
+            var childH = SW(54 + 26 * Math.Max(1, macro.Steps.Count) + 16);
             if (ImGui.BeginChild($"##macroedit{mi}", new Vector2(0, childH), true))
             {
                 var label = macro.Label;
@@ -476,6 +479,8 @@ public partial class MainWindow
                 if (ImGui.InputTextWithHint("Button label", "e.g. Hand over menu", ref label, 48)) { macro.Label = label; Menu.Save(); }
 
                 int? stepRemove = null;
+                ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(4f, 2f));
+                ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(6f, 3f));
                 for (var s = 0; s < macro.Steps.Count; s++)
                 {
                     var step = macro.Steps[s];
@@ -502,6 +507,7 @@ public partial class MainWindow
                     ImGui.PopID();
                 }
                 if (stepRemove != null) { macro.Steps.RemoveAt(stepRemove.Value); Menu.Save(); }
+                ImGui.PopStyleVar(2);
 
                 if (ImGui.SmallButton("+ Add step")) { macro.Steps.Add(new ServeStep(string.Empty, 1.0f)); Menu.Save(); }
                 ImGui.SameLine(0, 16);

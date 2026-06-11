@@ -77,6 +77,18 @@ public class Configuration : IPluginConfiguration
     public List<GiveawayRoll> GiveawayOrdered = new();   // first roll per player
     public List<GiveawayRoll> GiveawayFeed = new();      // every roll, newest first
     public bool GiveawayRunning = false;
+    // When on, only a plain /random (out of 999) counts; /random N is rejected
+    // so players can't pick a small range to game the result.
+    public bool GiveawayPlainRandomOnly = true;
+    // When on, /dice rolls also count in giveaways (default: /random only).
+    public bool GiveawayAllowDice = false;
+
+    // ---- Global settings (Settings tab) --------------------------------
+    // Master kill switch: when on, the plugin sends no chat and watches no
+    // trades. Reversible; for when something misbehaves mid-event.
+    public bool PanicMode = false;
+    // When on, destructive actions require a two-stage confirm (default on).
+    public bool ConfirmDestructive = true;
     public DateTime GiveawayStarted = DateTime.Now;
     public int GiveawayModes = 1;                          // GiveawayMode flags (default Highest)
     public int GiveawayClosestTarget = 500;
@@ -193,4 +205,62 @@ public class Configuration : IPluginConfiguration
     }
 
     public void Save() => this.pluginInterface!.SavePluginConfig(this);
+
+    // ---- Backup / restore ---------------------------------------------
+    // Writes the entire configuration (all venues, menus, games, history, etc.)
+    // to a JSON file the user chooses, so they can keep a manual backup.
+    public (bool ok, string message) ExportBackup(string folder)
+    {
+        try
+        {
+            var dir = string.IsNullOrWhiteSpace(folder)
+                ? this.pluginInterface!.GetPluginConfigDirectory()
+                : folder.Trim();
+            System.IO.Directory.CreateDirectory(dir);
+            var file = System.IO.Path.Combine(dir, $"VenueHelper-backup-{DateTime.Now:yyyyMMdd-HHmmss}.json");
+            var json = Newtonsoft.Json.JsonConvert.SerializeObject(this, Newtonsoft.Json.Formatting.Indented,
+                new Newtonsoft.Json.JsonSerializerSettings { TypeNameHandling = Newtonsoft.Json.TypeNameHandling.Auto });
+            System.IO.File.WriteAllText(file, json);
+            return (true, $"Backup saved: {file}");
+        }
+        catch (Exception ex)
+        {
+            return (false, $"Backup failed: {ex.Message}");
+        }
+    }
+
+    // Restores from a backup file, copying its values onto this config in place
+    // (so the live plugin picks them up), then saves.
+    public (bool ok, string message) ImportBackup(string filePath)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(filePath) || !System.IO.File.Exists(filePath))
+                return (false, "Backup file not found. Paste the full path to a VenueHelper backup .json.");
+            var json = System.IO.File.ReadAllText(filePath);
+            var loaded = Newtonsoft.Json.JsonConvert.DeserializeObject<Configuration>(json,
+                new Newtonsoft.Json.JsonSerializerSettings { TypeNameHandling = Newtonsoft.Json.TypeNameHandling.Auto });
+            if (loaded == null) return (false, "Could not read that backup file.");
+            CopyFrom(loaded);
+            Save();
+            return (true, "Backup restored. All your data has been replaced from the file.");
+        }
+        catch (Exception ex)
+        {
+            return (false, $"Restore failed: {ex.Message}");
+        }
+    }
+
+    // Copies every persisted public field from another config onto this one.
+    // Reflection keeps this correct automatically as fields are added, and skips
+    // the [NonSerialized] plugin-interface handle.
+    private void CopyFrom(Configuration o)
+    {
+        foreach (var field in typeof(Configuration).GetFields(
+                     System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+        {
+            if (Attribute.IsDefined(field, typeof(NonSerializedAttribute))) continue;
+            field.SetValue(this, field.GetValue(o));
+        }
+    }
 }

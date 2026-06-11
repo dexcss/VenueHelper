@@ -89,11 +89,46 @@ public class GiveawayTracker
         Config.Save();
     }
 
+    // Records a rejected roll in the feed (flagged invalid) so the host sees it.
+    private void LogInvalid(string fullName, int roll, int outOf, string reason)
+    {
+        var bad = new GiveawayRoll
+        {
+            FullName = fullName,
+            Roll = roll,
+            OutOf = outOf,
+            When = DateTime.Now,
+            Invalid = true,
+            InvalidReason = reason,
+        };
+        Config.GiveawayFeed.Insert(0, bad);
+        if (Config.GiveawayFeed.Count > MaxFeed)
+            Config.GiveawayFeed.RemoveRange(MaxFeed, Config.GiveawayFeed.Count - MaxFeed);
+        Config.Save();
+    }
+
     // Called by the hook for every /random or /dice while a giveaway is running.
-    public void OnRoll(string fullName, int roll, int outOf)
+    public void OnRoll(string fullName, int roll, int outOf, bool isDice = false)
     {
         if (!Config.GiveawayRunning)
             return;
+
+        // /dice only counts if the host enabled it; default is /random only.
+        if (isDice && !Config.GiveawayAllowDice)
+        {
+            LogInvalid(fullName, roll, outOf, "used /dice \u2014 /dice is not enabled for this giveaway");
+            return;
+        }
+
+        // Enforce plain /random for /random rolls: a /random N (outOf > 0 and not
+        // the default 999) is rejected so players can't shrink the range. Still
+        // logged in the feed, flagged invalid, so the host can see it.
+        var isPlain = outOf <= 0 || outOf == 999;
+        if (!isDice && Config.GiveawayPlainRandomOnly && !isPlain)
+        {
+            LogInvalid(fullName, roll, outOf, $"used /random {outOf} \u2014 must use plain /random");
+            return;
+        }
 
         var entry = new GiveawayRoll
         {

@@ -28,6 +28,10 @@ public sealed class Plugin : IDalamudPlugin
 
     public Configuration Configuration { get; init; }
 
+    // Static mirror of the master kill switch so static helpers (ChatSender,
+    // TradeWatcher) can check it without a Plugin reference.
+    public static bool Panic { get; set; }
+
     public VenueCounter Counter { get; init; }
     public RaffleService Raffle { get; init; }
     public AuctionService Auction { get; init; }
@@ -52,6 +56,7 @@ public sealed class Plugin : IDalamudPlugin
 
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
         Configuration.Initialize(PluginInterface);
+        Panic = Configuration.PanicMode;
 
         Counter = new VenueCounter(this);
         Raffle = new RaffleService(this);

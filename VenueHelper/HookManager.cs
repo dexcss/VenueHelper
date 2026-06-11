@@ -56,7 +56,7 @@ public unsafe class HookManager
             var roll = (*parameter)[1].IntValue;
             var outOf = logMessageId == 3887 ? (*parameter)[2].IntValue : 0;
 
-            Plugin.Giveaway.OnRoll(fullName, roll, outOf);
+            Plugin.Giveaway.OnRoll(fullName, roll, outOf, isDice: false);
             Plugin.Deathroll.OnRoll(fullName, roll, outOf);
             Plugin.BarGames.OnRoll(fullName, roll, outOf);
         }
@@ -76,7 +76,7 @@ public unsafe class HookManager
             var world = Plugin.Data.GetExcelSheet<World>().GetRow(worldId);
             var fullName = $"{name}\uE05D{world.Name}";
 
-            Plugin.Giveaway.OnRoll(fullName, roll, outOf);
+            Plugin.Giveaway.OnRoll(fullName, roll, outOf, isDice: true);
             Plugin.Deathroll.OnRoll(fullName, roll, outOf);
             Plugin.BarGames.OnRoll(fullName, roll, outOf);
         }

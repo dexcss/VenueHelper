@@ -210,20 +210,22 @@ public partial class MainWindow
             {
                 // In standard mode, a feed roll is "counted" if it's the first
                 // for that player. In race mode every roll counts.
-                var counted = Give.ExactMatchOn || Give.IsCounted(f);
+                var counted = !f.Invalid && (Give.ExactMatchOn || Give.IsCounted(f));
                 ImGui.TableNextRow();
                 ImGui.TableNextColumn();
                 ImGui.AlignTextToFramePadding();
                 ImGui.TextColored(Grey, f.When.ToString("HH:mm:ss"));
                 ImGui.TableNextColumn();
-                if (!Give.ExactMatchOn && !counted)
+                if (f.Invalid)
+                    ImGui.TextColored(Red, $"{f.NameOnly} \u2014 {f.InvalidReason}");
+                else if (!Give.ExactMatchOn && !counted)
                     ImGui.TextColored(Grey, $"{f.NameOnly} (later roll)");
                 else
                     ImGui.TextUnformatted(f.NameOnly);
                 ImGui.TableNextColumn();
-                ImGui.TextColored(counted ? Green : Grey, f.Roll.ToString());
+                ImGui.TextColored(f.Invalid ? Red : (counted ? Green : Grey), f.Roll.ToString());
                 ImGui.TableNextColumn();
-                ImGui.TextColored(Grey, f.OutOf.ToString());
+                ImGui.TextColored(f.Invalid ? Red : Grey, f.OutOf.ToString());
             }
             ImGui.EndTable();
         }

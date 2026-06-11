@@ -12,6 +12,7 @@ public partial class MainWindow
     private float houseCutInput = -1f; // lazily synced from config
     private string auctionHistorySearch = string.Empty;
     private bool showAuctionHistory = false;
+    private readonly Dictionary<Guid, string> auctionPriceEdits = new();
     // History date filter (YYYY-MM-DD text; empty = unbounded).
     private string histFrom = string.Empty;
     private string histTo = string.Empty;
@@ -205,15 +206,28 @@ public partial class MainWindow
                 }
 
                 ImGui.TableNextColumn();
-                var priceInt = (int)e.SalePrice;
                 ImGui.SetNextItemWidth(-1);
-                // step = 0 hides the +/- buttons; the host types the amount.
-                // Negative amounts are allowed (a sale TO the house).
-                if (ImGui.InputInt("##price", ref priceInt, 0, 0))
+                // Editable as shorthand: type "3.4M", "500k", or a plain number
+                // (negative = sale to the house). Parsed live; falls back to the
+                // raw value if not yet valid.
+                if (!auctionPriceEdits.TryGetValue(e.Id, out var priceText))
+                    priceText = e.SalePrice == 0 ? string.Empty : e.SalePrice.ToString();
+                if (ImGui.InputTextWithHint("##price", "e.g. 3.4M", ref priceText, 24))
                 {
-                    e.SalePrice = priceInt;
-                    Auction.Save();
+                    auctionPriceEdits[e.Id] = priceText;
+                    if (GilFormat.TryParse(priceText, out var parsed))
+                    {
+                        e.SalePrice = parsed;
+                        Auction.Save();
+                    }
+                    else if (string.IsNullOrWhiteSpace(priceText))
+                    {
+                        e.SalePrice = 0;
+                        Auction.Save();
+                    }
                 }
+                if (ImGui.IsItemHovered() && e.SalePrice != 0)
+                    ImGui.SetTooltip($"{e.SalePrice:N0} gil");
 
                 ImGui.TableNextColumn();
                 if (ImGui.Button("Sold"))
@@ -335,7 +349,7 @@ public partial class MainWindow
         const ImGuiTableFlags flags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg
                                       | ImGuiTableFlags.ScrollY | ImGuiTableFlags.SizingStretchProp;
 
-        if (ImGui.BeginTable("##auctionhistory", 8, flags, new Vector2(0, 300)))
+        if (ImGui.BeginTable("##auctionhistory", 9, flags, new Vector2(0, 300)))
         {
             ImGui.TableSetupScrollFreeze(0, 1);
             ImGui.TableSetupColumn("Time", ImGuiTableColumnFlags.WidthFixed, SW(110));
@@ -346,6 +360,7 @@ public partial class MainWindow
             ImGui.TableSetupColumn("Cut %", ImGuiTableColumnFlags.WidthFixed, SW(50));
             ImGui.TableSetupColumn("House", ImGuiTableColumnFlags.WidthFixed, SW(95));
             ImGui.TableSetupColumn("Payout", ImGuiTableColumnFlags.WidthFixed, SW(95));
+            ImGui.TableSetupColumn("##del", ImGuiTableColumnFlags.WidthFixed, SW(30));
             ImGui.TableHeadersRow();
 
             var rows = filtered
@@ -355,8 +370,10 @@ public partial class MainWindow
                             || r.Winner.Contains(auctionHistorySearch, StringComparison.OrdinalIgnoreCase))
                 .ToList();
 
+            AuctionRecord? toDelete = null;
             foreach (var r in rows)
             {
+                ImGui.PushID(r.Id.ToString());
                 ImGui.TableNextRow();
                 ImGui.TableNextColumn();
                 ImGui.AlignTextToFramePadding();
@@ -375,6 +392,20 @@ public partial class MainWindow
                 ImGui.TextColored(Green, r.HouseCut.ToString("N0"));
                 ImGui.TableNextColumn();
                 ImGui.TextColored(Blue, r.Payout.ToString("N0"));
+                ImGui.TableNextColumn();
+                if (ImGuiComponents.IconButton(FontAwesomeIcon.Trash))
+                {
+                    if (ImGui.GetIO().KeyCtrl) toDelete = r;
+                    else SetStatus("Hold Ctrl and click the trash icon to delete this entry.", Grey);
+                }
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Ctrl-click to delete this entry (for accidental records).");
+                ImGui.PopID();
+            }
+            if (toDelete != null)
+            {
+                Auction.RemoveHistory(toDelete);
+                SetStatus("Deleted the auction record.", Red);
             }
             ImGui.EndTable();
 

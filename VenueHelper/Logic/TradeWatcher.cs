@@ -29,6 +29,7 @@ public unsafe class TradeWatcher
 
     public void Update()
     {
+        if (Plugin.Panic) return; // master kill switch: don't watch trades
         if (!Plugin.Configuration.RaffleAutoTrade)
         {
             ResetSnapshot();

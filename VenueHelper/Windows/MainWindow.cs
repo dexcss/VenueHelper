@@ -85,6 +85,11 @@ public partial class MainWindow : Window, IDisposable
                 DrawMenuTab();
                 ImGui.EndTabItem();
             }
+            if (ImGui.BeginTabItem("Settings"))
+            {
+                DrawSettingsTab();
+                ImGui.EndTabItem();
+            }
             ImGui.EndTabBar();
         }
     }

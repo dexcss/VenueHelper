@@ -70,6 +70,7 @@ Start a round; each player's **first** `/random` (or `/dice`) counts.
 - Pick one or more winner modes: **Highest**, **Lowest**, and/or **Closest to** a target.
 - Or use **exact-match (race)** mode: every roll counts and the first to hit the target wins.
 - Every roll is shown for verification; winners are highlighted.
+- **Anti-cheat:** only a plain `/random` counts by default — a `/random N` (which would let someone shrink the range) is rejected and flagged in the feed. `/dice` is rejected too unless you enable it in Settings.
 
 ## DR Tourny Helper
 
@@ -105,6 +106,16 @@ Run a venue menu like a restaurant.
 - **Additional Macros** — reusable macro buttons (same multi-step sequences, no price) for adverts, menu hand-overs, and anything else you'd normally keep as a game macro.
 
 ---
+
+## Settings
+
+A dedicated tab for global preferences and safety:
+
+- **Default export folder** — set it once and every tab's export starts there.
+- **Panic switch** — one toggle that halts all chat-sending and trade-watching, for when something misbehaves mid-event. Fully reversible.
+- **Default step delay** — baseline pacing for serve sequences and macros.
+- **Rules** — allow `/dice` in giveaways, auto-credit raffle trades, and require confirmation before destructive actions.
+- **Backup & Restore** — save everything (venues, menus, games, raffles, auctions, history, settings) to a JSON file you keep, and restore it later.
 
 ## Persistence
 

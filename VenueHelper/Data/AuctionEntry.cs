@@ -6,6 +6,9 @@ namespace VenueHelper.Data;
 [Serializable]
 public class AuctionEntry
 {
+    // Stable id (for per-row UI state like the price-edit buffer).
+    public Guid Id = Guid.NewGuid();
+
     // Full name with world glyph (Name\uE05DWorld) when known, else bare name.
     public string FullName = string.Empty;
 
@@ -46,6 +49,7 @@ public class AuctionEntry
 [Serializable]
 public class AuctionRecord
 {
+    public Guid Id = Guid.NewGuid();
     public string FullName = string.Empty;
     public string Note = string.Empty;
     public string Winner = string.Empty;

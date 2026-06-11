@@ -14,6 +14,10 @@ public class GiveawayRoll
     public int Roll;
     public int OutOf; // the "out of" value (999 for plain /random)
     public DateTime When = DateTime.Now;
+    // Set when a roll was rejected (e.g. /random N when plain-only is enforced).
+    // Kept in the feed for the host to see, but never counted as an entry.
+    public bool Invalid;
+    public string InvalidReason = string.Empty;
 
     public string NameOnly
     {

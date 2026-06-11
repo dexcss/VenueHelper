@@ -124,6 +124,9 @@ public static unsafe class ChatSender
 
     private static (bool ok, string message) Send(string message)
     {
+        if (Plugin.Panic)
+            return (false, "Panic mode is on \u2014 chat sending is disabled (turn it off in Settings).");
+
         var clean = Sanitise(message);
         if (clean.Length == 0)
             return (false, "Nothing to send after cleaning the text.");
