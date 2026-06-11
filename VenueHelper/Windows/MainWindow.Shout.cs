@@ -6,21 +6,21 @@ namespace VenueHelper.Windows;
 
 public partial class MainWindow
 {
-    private const int ShoutPresetCount = 10;
+    private const int ShoutPresetMin = 3;
     private static readonly string[] ChannelLabels = { "Say", "Yell", "Shout", "Party" };
 
     private void DrawShoutTab()
     {
         currentTab = "Shout/Yell Helper";
 
-        // Make sure there are always 10 preset slots to fill.
-        while (Config.ShoutPresets.Count < ShoutPresetCount)
+        // Always keep at least a few slots so the tab isn't empty.
+        while (Config.ShoutPresets.Count < ShoutPresetMin)
             Config.ShoutPresets.Add(new ShoutPreset());
 
         ImGui.TextColored(Gold, "Shout / Yell Helper");
         ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + SW(560));
         ImGui.TextColored(Grey,
-            "Pre-write up to 10 announcements, pick a channel for each, and fire them with one click. " +
+            "Pre-write announcements, pick a channel for each, and fire them with one click. " +
             "Messages are sent through the game's chat box, exactly as if you typed and pressed Enter.");
         ImGui.PopTextWrapPos();
 
@@ -30,7 +30,8 @@ public partial class MainWindow
 
         ImGuiHelpers.ScaledDummy(8f);
 
-        for (var i = 0; i < ShoutPresetCount; i++)
+        int? removeAt = null;
+        for (var i = 0; i < Config.ShoutPresets.Count; i++)
         {
             var preset = Config.ShoutPresets[i];
             ImGui.PushID(i);
@@ -52,11 +53,12 @@ public partial class MainWindow
                 ImGui.EndCombo();
             }
 
-            // Message box (fills remaining width, leaving room for Send).
+            // Message box (fills remaining width, leaving room for Send + remove).
             ImGui.SameLine();
             var msg = preset.Message;
-            var sendWidth = ImGui.CalcTextSize("Send").X + ImGui.GetStyle().FramePadding.X * 2 + SW(8);
-            ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - sendWidth - SW(8));
+            var sendWidth = ImGui.CalcTextSize("Send").X + ImGui.GetStyle().FramePadding.X * 2;
+            var xWidth = ImGui.CalcTextSize(" X ").X + ImGui.GetStyle().FramePadding.X * 2;
+            ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - sendWidth - xWidth - SW(16));
             if (ImGui.InputTextWithHint($"##msg{i}", "Type an announcement...", ref msg, 400))
             {
                 preset.Message = msg;
@@ -74,15 +76,37 @@ public partial class MainWindow
             }
             if (empty) ImGui.EndDisabled();
 
+            // Remove this preset (only if above the minimum, so there's always 1+).
+            ImGui.SameLine();
+            var canRemove = Config.ShoutPresets.Count > 1;
+            if (!canRemove) ImGui.BeginDisabled();
+            ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.45f, 0.15f, 0.15f, 1f));
+            if (ImGui.Button("X")) removeAt = i;
+            ImGui.PopStyleColor();
+            if (!canRemove) ImGui.EndDisabled();
+            if (ImGui.IsItemHovered() && canRemove) ImGui.SetTooltip("Remove this preset.");
+
             ImGui.PopID();
         }
 
-        ImGuiHelpers.ScaledDummy(8f);
-        if (ImGui.Button("Clear all presets"))
+        if (removeAt != null)
+        {
+            Config.ShoutPresets.RemoveAt(removeAt.Value);
+            Config.Save();
+        }
+
+        ImGuiHelpers.ScaledDummy(6f);
+        if (ImGui.Button("+ Add another"))
+        {
+            Config.ShoutPresets.Add(new ShoutPreset());
+            Config.Save();
+        }
+        ImGui.SameLine(0, 16);
+        if (ImGui.Button("Clear all"))
             ImGui.OpenPopup("##clearshouts");
         if (ImGui.BeginPopup("##clearshouts"))
         {
-            ImGui.TextColored(Red, "Clear all 10 preset messages?");
+            ImGui.TextColored(Red, "Clear the text of all presets?");
             if (ImGui.Button("Yes, clear"))
             {
                 foreach (var p in Config.ShoutPresets) { p.Message = string.Empty; p.Channel = ChatChannel.Yell; }

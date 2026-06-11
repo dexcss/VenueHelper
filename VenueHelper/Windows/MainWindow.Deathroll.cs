@@ -43,7 +43,7 @@ public partial class MainWindow
             Dr.Kind = BracketKind.DoubleElimination;
         if (!single) ImGui.PopStyleColor();
         if (Dr.Kind == BracketKind.DoubleElimination)
-            ImGui.TextColored(Grey, "(Double elim isn't wired up yet \u2014 use single for now.)");
+            ImGui.TextColored(Grey, "Losers get a second chance; a player is out after two losses.");
 
         ImGuiHelpers.ScaledDummy(6f);
 
@@ -190,7 +190,7 @@ public partial class MainWindow
                 ImGui.BeginGroup();
 
                 // Round header.
-                ImGui.TextColored(Gold, RoundName(r, rounds));
+                ImGui.TextColored(Gold, RoundName(r, rounds, matches));
                 ImGui.TextColored(Grey, $"{matches.Count(x => x.State == MatchState.Done)}/{matches.Count} done");
                 ImGuiHelpers.ScaledDummy(2f);
 
@@ -353,8 +353,19 @@ public partial class MainWindow
         if (ImGui.SmallButton("Stop refereeing")) Dr.StopMatch();
     }
 
-    private static string RoundName(int round, int totalRounds)
+    private string RoundName(int round, int totalRounds, List<Data.DeathrollMatch> matches)
     {
+        // Double elimination: label by bracket.
+        if (Dr.Kind == Data.BracketKind.DoubleElimination)
+        {
+            // The single highest round is the grand final.
+            if (round == totalRounds && matches.Count == 1)
+                return "Grand Final";
+            if (matches.Count > 0 && matches[0].IsLosersBracket)
+                return $"Losers Round {round}";
+            return $"Winners Round {round}";
+        }
+
         var fromEnd = totalRounds - round;
         return fromEnd switch
         {

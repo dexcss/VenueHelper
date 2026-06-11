@@ -38,6 +38,15 @@ public class BarGamePlayer
     public string FullName = string.Empty;
     public long GilPaid;       // total gil traded in
     public int PlaysUsed;      // rolls consumed
+    // For survival-streak games: current consecutive successes, and whether
+    // this player's run has already ended (busted or won).
+    public int Streak;
+    public bool StreakBusted;
+    public bool StreakWon;
+    public int LastRoll = -1;        // previous roll, for dynamic higher/lower
+    public int PendingCall;          // host's call for the next dynamic roll: +1 higher, -1 lower, 0 none
+    public long TierWinnings;        // gil earned so far in a tiered survival run
+    public int BestStreak;           // best streak achieved (for high-score mode)
 
     public BarGamePlayer() { }
     public BarGamePlayer(string fullName) => FullName = fullName;

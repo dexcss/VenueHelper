@@ -7,8 +7,8 @@ namespace VenueHelper.Windows;
 public partial class MainWindow
 {
     private string newBarGameName = string.Empty;
-    private string barGameNewNumber = string.Empty;
     private string barManualPlayer = string.Empty;
+    private int barManualRoll = 0;
     private ChatChannel barAnnounceChannel = ChatChannel.Shout;
     // null = on the game-picker screen; otherwise editing this game.
     private BarGame? openBarGame = null;
@@ -16,7 +16,9 @@ public partial class MainWindow
     private bool barEditMode = false;
 
     private static readonly string[] RollKindLabels = { "/random (0-999)", "/random N", "/dice N" };
-    private static readonly string[] WinCondLabels = { "Specific number(s)", "In a range", "Highest roll", "Lowest roll", "Closest to" };
+    private static readonly string[] WinCondLabels = { "Specific number(s)", "In a range", "Highest roll", "Lowest roll", "Closest to", "Survival streak (X in a row)" };
+    private static readonly string[] SurvivalModeLabels = { "Same number each roll", "Higher/lower than a set number", "Higher/lower than previous roll (call it)" };
+    private static readonly string[] SurvivalPrizeLabels = { "Fixed (reach a streak, win the pot/amount)", "Tiered (pays per success past a threshold)", "High score (longest streak wins the pot)" };
     private static readonly string[] PrizeKindLabels = { "Fixed gil", "% of pot" };
 
     private BarGameService Bar => Plugin.BarGames;
@@ -111,6 +113,27 @@ public partial class MainWindow
     }
 
     // ---- Play view (clean, setup hidden) ------------------------------
+    // Describes a single survival roll for the table (hit/miss where it can be
+    // determined from the rules alone). Dynamic mode depends on the live call,
+    // so it's shown neutrally.
+    private (string label, Vector4 color) SurvivalRollResult(BarGame g, int roll)
+    {
+        switch (g.Survival)
+        {
+            case SurvivalMode.SameNumber:
+                return g.WinningNumbers.Contains(roll)
+                    ? ("\u2713 hit", Green)
+                    : ("\u2717 miss", Red);
+            case SurvivalMode.StaticHL:
+                var ok = g.StaticHigher ? roll > g.StaticThreshold : roll < g.StaticThreshold;
+                return ok
+                    ? ($"\u2713 {(g.StaticHigher ? ">" : "<")} {g.StaticThreshold}", Green)
+                    : ($"\u2717 {(g.StaticHigher ? ">" : "<")} {g.StaticThreshold}", Red);
+            default: // DynamicHL \u2014 outcome depends on the call at the time
+                return ("rolled", new Vector4(0.85f, 0.85f, 0.85f, 1f));
+        }
+    }
+
     private void DrawBarGamePlay(BarGame g)
     {
         if (g.CurrentPot < g.StartingPot && !g.PotStarted)
@@ -131,6 +154,12 @@ public partial class MainWindow
             barEditMode = true;
             return;
         }
+        ImGui.SameLine();
+        DrawExportButton("##export_bargame",
+            new ExportItem("Roll history (names, rolls, results)", "bargame_rolls",
+                () => ExportData.BarGameHistory(g)),
+            new ExportItem("Player summary (gil paid, plays)", "bargame_players",
+                () => ExportData.BarGamePlayers(g)));
 
         ImGuiHelpers.ScaledDummy(6f);
         ImGui.TextColored(Gold, g.Name);
@@ -257,6 +286,28 @@ public partial class MainWindow
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Grants one free play \u2014 they get a roll but it does NOT add to the pot.");
 
+        // Manual roll entry: enter a roll for someone who rolled early / before
+        // capture. Reuses the same name box; routes through the normal scoring.
+        ImGui.TextColored(Grey, "Rolled early?");
+        ImGui.SameLine();
+        ImGui.SetNextItemWidth(SW(110));
+        ImGui.InputInt("##manualroll", ref barManualRoll, 1, 10);
+        ImGui.SameLine();
+        if (ImGui.Button("Enter roll"))
+        {
+            if (string.IsNullOrWhiteSpace(barManualPlayer))
+                SetStatus("Enter or target a name first (uses the box above).", Red);
+            else if (barManualRoll <= 0)
+                SetStatus("Enter the number they rolled.", Red);
+            else
+            {
+                Bar.ManualRoll(g, barManualPlayer.Replace('@', '\uE05D'), barManualRoll);
+                SetStatus($"Entered roll {barManualRoll} for {barManualPlayer}.", Green);
+            }
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Manually record a roll for the name in the box above \u2014 scored exactly like a captured /random. Useful when someone rolls before you start capturing. They still need a paid buy-in/freebie to count.");
+
         ImGuiHelpers.ScaledDummy(6f);
 
         // Comparative winner highlight.
@@ -264,9 +315,143 @@ public partial class MainWindow
         if (compWinner != null)
             ImGui.TextColored(Gold, $"Current winner: {compWinner.NameOnly} with {compWinner.Roll}");
 
+        // Survival-streak per-player status.
+        if (g.Condition == WinCondition.SurvivalStreak && g.Players.Count > 0)
+        {
+            var tiered = g.SurvivalPrizeKind == SurvivalPrize.Tiered;
+            var highScore = g.SurvivalPrizeKind == SurvivalPrize.HighScore;
+            var need = Math.Max(1, g.StreakNeeded);
+
+            BarGamePlayer? leader = highScore ? BarGameService.HighScoreLeader(g) : null;
+            if (highScore)
+            {
+                ImGui.TextColored(Blue, "Leaderboard (longest streak wins):");
+                ImGui.SameLine();
+                if (leader != null)
+                    ImGui.TextColored(Gold, $"\u2605 {leader.NameOnly} leads with {leader.BestStreak} \u2014 pot {BarGameService.Payout(g):N0} gil");
+                else
+                    ImGui.TextColored(Grey, "no scores yet");
+            }
+            else
+            {
+                ImGui.TextColored(Blue, tiered
+                    ? $"Runs ({g.TierPerStep:N0} gil per success past {g.TierThreshold}):"
+                    : $"Runs (need {need} in a row):");
+            }
+            ImGui.SameLine();
+            if (ImGui.SmallButton("Reset all runs")) Bar.ResetAllRuns(g);
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Resets everyone's current run at once (keeps buy-ins, pot, best streaks, and banked gil).");
+
+            string? resetTarget = null;
+            (string name, bool higher)? callTarget = null;
+            var ordered = highScore
+                ? g.Players.Values.OrderByDescending(p => p.BestStreak).ThenByDescending(p => p.Streak)
+                : g.Players.Values.OrderByDescending(p => p.StreakWon).ThenByDescending(p => p.Streak);
+
+            // "Active" = a run still in progress (not busted, not won).
+            var anyActive = g.Players.Values.Any(p => !p.StreakBusted && !p.StreakWon);
+            foreach (var pl in ordered)
+            {
+                var active = !pl.StreakBusted && !pl.StreakWon;
+                // Green while actively playing; red when their run is over (or, if
+                // nobody at all is active, the line reads red).
+                var nameCol = active && anyActive ? Green : Red;
+                if (highScore)
+                {
+                    var isLeader = leader != null && pl.FullName == leader.FullName && pl.BestStreak > 0;
+                    var live = pl.StreakBusted ? "out" : $"on {pl.Streak}";
+                    var line = $"  {(isLeader ? "\u2605 " : "")}{pl.NameOnly}: best {pl.BestStreak} ({live})";
+                    ImGui.TextColored(nameCol, line);
+                    ImGui.SameLine();
+                }
+                else
+                {
+                    var prog = tiered ? $"{pl.Streak} so far, banked {pl.TierWinnings:N0} gil" : $"{pl.Streak}/{need}";
+                    if (pl.StreakWon)
+                        ImGui.TextColored(Gold, $"  {pl.NameOnly}: WON! ({prog})");
+                    else if (pl.StreakBusted)
+                        ImGui.TextColored(Red, $"  {pl.NameOnly}: out ({prog})" + (tiered && pl.TierWinnings > 0 ? $" \u2014 pay {pl.TierWinnings:N0} gil" : ""));
+                    else
+                        ImGui.TextColored(Green, $"  {pl.NameOnly}: {prog}");
+                }
+
+                // Dynamic higher/lower: show the call buttons + current baseline.
+                if (g.Survival == SurvivalMode.DynamicHL && !pl.StreakWon && !pl.StreakBusted)
+                {
+                    ImGui.SameLine();
+                    ImGui.PushID($"call{pl.FullName}");
+                    if (pl.LastRoll >= 0)
+                    {
+                        if (pl.PendingCall != 0)
+                        {
+                            ImGui.TextColored(Gold, $"\u2192 last {pl.LastRoll}, called {(pl.PendingCall > 0 ? "HIGHER" : "LOWER")} \u2014 they roll now");
+                        }
+                        else
+                        {
+                            ImGui.TextColored(new Vector4(1f, 0.8f, 0.2f, 1f), $"\u2192 last {pl.LastRoll}. Set their call:");
+                            ImGui.SameLine();
+                            if (ImGui.SmallButton("Higher")) callTarget = (pl.FullName, true);
+                            ImGui.SameLine();
+                            if (ImGui.SmallButton("Lower")) callTarget = (pl.FullName, false);
+                        }
+                    }
+                    else
+                    {
+                        ImGui.TextColored(Grey, "\u2192 they roll once to set their starting number");
+                    }
+                    ImGui.PopID();
+                }
+
+                ImGui.SameLine();
+                ImGui.PushID($"reset{pl.FullName}");
+                if (ImGui.SmallButton("Reset run")) resetTarget = pl.FullName;
+                ImGui.PopID();
+            }
+            if (callTarget != null) Bar.SetCall(g, callTarget.Value.name, callTarget.Value.higher);
+            if (resetTarget != null) Bar.ResetPlayerRun(g, resetTarget);
+            ImGuiHelpers.ScaledDummy(4f);
+        }
+
         // Rolls table.
         const ImGuiTableFlags tflags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.SizingStretchProp;
-        if (ImGui.BeginTable("##barplays", 4, tflags, new Vector2(0, SW(220))))
+
+        if (g.Condition == WinCondition.SurvivalStreak)
+        {
+            // Survival: one line per player, showing their rolls in order with
+            // hit/miss coloring, instead of one row per roll.
+            if (ImGui.BeginChild("##barsurvlist", new Vector2(0, SW(220)), true))
+            {
+                // Group plays by player, preserving roll order.
+                var byPlayer = new List<(string name, List<BarGamePlay> rolls)>();
+                foreach (var play in g.Plays)
+                {
+                    var entry = byPlayer.FirstOrDefault(e => e.name == play.NameOnly);
+                    if (entry.rolls == null)
+                    {
+                        entry = (play.NameOnly, new List<BarGamePlay>());
+                        byPlayer.Add(entry);
+                    }
+                    entry.rolls.Add(play);
+                }
+
+                if (byPlayer.Count == 0)
+                    ImGui.TextColored(Grey, "No rolls yet.");
+
+                foreach (var (name, rolls) in byPlayer)
+                {
+                    ImGui.TextColored(new Vector4(0.95f, 0.9f, 0.75f, 1f), $"{name}:");
+                    foreach (var play in rolls)
+                    {
+                        var (_, col) = SurvivalRollResult(g, play.Roll);
+                        ImGui.SameLine(0, 8);
+                        ImGui.TextColored(col, $"{play.Roll}");
+                    }
+                }
+            }
+            ImGui.EndChild();
+        }
+        else if (ImGui.BeginTable("##barplays", 4, tflags, new Vector2(0, SW(220))))
         {
             ImGui.TableSetupScrollFreeze(0, 1);
             ImGui.TableSetupColumn("Player", ImGuiTableColumnFlags.WidthStretch, 1.6f);
@@ -384,24 +569,41 @@ public partial class MainWindow
         switch (g.Condition)
         {
             case WinCondition.SpecificNumbers:
-                ImGui.TextColored(Grey, "Winning numbers:");
-                foreach (var n in g.WinningNumbers.ToList())
+                ImGui.TextColored(Grey, "Winning numbers \u2014 a roll wins if it matches any of these:");
+                if (g.WinningNumbers.Count == 0)
+                    ImGui.TextColored(Red, "No winning numbers set yet. Click \"+ Add winning number\" below.");
+
+                int? removeAt = null;
+                for (var wn = 0; wn < g.WinningNumbers.Count; wn++)
                 {
+                    ImGui.PushID($"win{wn}");
+                    ImGui.TextColored(Grey, $"#{wn + 1}");
                     ImGui.SameLine();
-                    if (ImGui.SmallButton($"{n} x##{n}")) { g.WinningNumbers.Remove(n); Config.Save(); }
-                }
-                ImGui.SetNextItemWidth(SW(90));
-                ImGui.InputTextWithHint("##addnum", "number", ref barGameNewNumber, 8);
-                ImGui.SameLine();
-                if (ImGui.Button("Add number"))
-                {
-                    if (int.TryParse(barGameNewNumber.Trim(), out var v) && !g.WinningNumbers.Contains(v))
+                    var val = g.WinningNumbers[wn];
+                    ImGui.SetNextItemWidth(SW(120));
+                    if (ImGui.InputInt("##winnum", ref val, 1, 5))
                     {
-                        g.WinningNumbers.Add(v);
-                        g.WinningNumbers.Sort();
+                        g.WinningNumbers[wn] = Math.Max(0, val);
                         Config.Save();
                     }
-                    barGameNewNumber = string.Empty;
+                    ImGui.SameLine();
+                    ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.45f, 0.15f, 0.15f, 1f));
+                    if (ImGui.Button("Remove")) removeAt = wn;
+                    ImGui.PopStyleColor();
+                    ImGui.PopID();
+                }
+                if (removeAt != null)
+                {
+                    g.WinningNumbers.RemoveAt(removeAt.Value);
+                    Config.Save();
+                }
+
+                if (ImGui.Button("+ Add winning number"))
+                {
+                    // Default the new box to one past the current highest (or 1).
+                    var next = g.WinningNumbers.Count > 0 ? g.WinningNumbers.Max() + 1 : 1;
+                    g.WinningNumbers.Add(next);
+                    Config.Save();
                 }
                 break;
             case WinCondition.InRange:
@@ -415,6 +617,109 @@ public partial class MainWindow
                 var tgt = g.ClosestTarget;
                 ImGui.SetNextItemWidth(SW(140));
                 if (ImGui.InputInt("Target", ref tgt, 1, 10)) { g.ClosestTarget = tgt; Config.Save(); }
+                break;
+            case WinCondition.SurvivalStreak:
+                ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + SW(540));
+                ImGui.TextColored(Grey, "Players keep rolling on one buy-in until they miss. Pick how a roll \"succeeds\":");
+                ImGui.PopTextWrapPos();
+
+                // Mode selector.
+                ImGui.SetNextItemWidth(SW(320));
+                var sm = (int)g.Survival;
+                if (ImGui.BeginCombo("Survival mode", SurvivalModeLabels[sm]))
+                {
+                    for (var i = 0; i < SurvivalModeLabels.Length; i++)
+                        if (ImGui.Selectable(SurvivalModeLabels[i], i == sm)) { g.Survival = (SurvivalMode)i; Config.Save(); }
+                    ImGui.EndCombo();
+                }
+
+                switch (g.Survival)
+                {
+                    case SurvivalMode.SameNumber:
+                        ImGui.TextColored(Grey, "Success number(s) \u2014 a roll continues the streak if it matches any:");
+                        if (g.WinningNumbers.Count == 0)
+                            ImGui.TextColored(Red, "No success numbers set. Click \"+ Add success number\".");
+                        int? sRemove = null;
+                        for (var wn = 0; wn < g.WinningNumbers.Count; wn++)
+                        {
+                            ImGui.PushID($"surv{wn}");
+                            ImGui.TextColored(Grey, $"#{wn + 1}");
+                            ImGui.SameLine();
+                            var val = g.WinningNumbers[wn];
+                            ImGui.SetNextItemWidth(SW(120));
+                            if (ImGui.InputInt("##survnum", ref val, 1, 5)) { g.WinningNumbers[wn] = Math.Max(0, val); Config.Save(); }
+                            ImGui.SameLine();
+                            ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.45f, 0.15f, 0.15f, 1f));
+                            if (ImGui.Button("Remove")) sRemove = wn;
+                            ImGui.PopStyleColor();
+                            ImGui.PopID();
+                        }
+                        if (sRemove != null) { g.WinningNumbers.RemoveAt(sRemove.Value); Config.Save(); }
+                        if (ImGui.Button("+ Add success number"))
+                        {
+                            var next = g.WinningNumbers.Count > 0 ? g.WinningNumbers.Max() + 1 : 1;
+                            g.WinningNumbers.Add(next);
+                            Config.Save();
+                        }
+                        break;
+                    case SurvivalMode.StaticHL:
+                        var higher = g.StaticHigher;
+                        ImGui.SetNextItemWidth(SW(160));
+                        if (ImGui.BeginCombo("Direction", higher ? "Higher than" : "Lower than"))
+                        {
+                            if (ImGui.Selectable("Higher than", higher)) { g.StaticHigher = true; Config.Save(); }
+                            if (ImGui.Selectable("Lower than", !higher)) { g.StaticHigher = false; Config.Save(); }
+                            ImGui.EndCombo();
+                        }
+                        ImGui.SameLine();
+                        var thr = g.StaticThreshold;
+                        ImGui.SetNextItemWidth(SW(120));
+                        if (ImGui.InputInt("Threshold", ref thr, 1, 5)) { g.StaticThreshold = thr; Config.Save(); }
+                        ImGui.TextColored(Grey, $"Each roll must be {(g.StaticHigher ? "higher" : "lower")} than {g.StaticThreshold} to continue.");
+                        break;
+                    case SurvivalMode.DynamicHL:
+                        ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + SW(540));
+                        ImGui.TextColored(Grey, "Each player rolls a baseline, then you set their Higher/Lower call (in the play view) before each next roll. Beating the previous roll in the called direction continues the streak.");
+                        ImGui.PopTextWrapPos();
+                        break;
+                }
+
+                // ---- Prize style ----
+                ImGuiHelpers.ScaledDummy(4f);
+                ImGui.TextColored(Blue, "Survival prize");
+                var sp = (int)g.SurvivalPrizeKind;
+                ImGui.SetNextItemWidth(SW(260));
+                if (ImGui.BeginCombo("Payout style", SurvivalPrizeLabels[sp]))
+                {
+                    for (var i = 0; i < SurvivalPrizeLabels.Length; i++)
+                        if (ImGui.Selectable(SurvivalPrizeLabels[i], i == sp)) { g.SurvivalPrizeKind = (SurvivalPrize)i; Config.Save(); }
+                    ImGui.EndCombo();
+                }
+                if (g.SurvivalPrizeKind == SurvivalPrize.Fixed)
+                {
+                    var need = g.StreakNeeded;
+                    ImGui.SetNextItemWidth(SW(140));
+                    if (ImGui.InputInt("In a row to win", ref need, 1, 1)) { g.StreakNeeded = Math.Max(1, need); Config.Save(); }
+                    ImGui.TextColored(Grey, "Reaching this streak wins the prize set in Pot & entry below.");
+                }
+                else if (g.SurvivalPrizeKind == SurvivalPrize.Tiered)
+                {
+                    var tt = g.TierThreshold;
+                    ImGui.SetNextItemWidth(SW(140));
+                    if (ImGui.InputInt("Pays after (in a row)", ref tt, 1, 1)) { g.TierThreshold = Math.Max(0, tt); Config.Save(); }
+                    var per = (int)g.TierPerStep;
+                    ImGui.SetNextItemWidth(SW(160));
+                    if (ImGui.InputInt("Gil per success after", ref per, 1000, 10000)) { g.TierPerStep = Math.Max(0, per); Config.Save(); }
+                    ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + SW(540));
+                    ImGui.TextColored(Grey, $"Each success past {g.TierThreshold} pays {g.TierPerStep:N0} gil. E.g. {g.TierThreshold + 3} in a row = {g.TierPerStep * 3:N0} gil. Players keep going until they miss; they keep what they've banked.");
+                    ImGui.PopTextWrapPos();
+                }
+                else // HighScore
+                {
+                    ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + SW(540));
+                    ImGui.TextColored(Grey, "Everyone plays; each player's score is their longest streak. The player with the highest streak wins the pot (set in Pot & entry below) \u2014 you declare the winner when the round's done. The current leader is highlighted live in the play view.");
+                    ImGui.PopTextWrapPos();
+                }
                 break;
         }
 

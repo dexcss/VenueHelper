@@ -93,7 +93,7 @@ public class DeathrollManager
         if (Kind == BracketKind.SingleElimination)
             BuildSingleElim();
         else
-            return (false, "Double elimination isn't available yet (single elim only for now).");
+            BuildDoubleElim();
 
         BracketBuilt = true;
         return (true, $"Bracket built for {Players.Count} players.");
@@ -160,6 +160,122 @@ public class DeathrollManager
         // Resolve byes and set initial readiness.
         foreach (var m in Matches)
             ResolveByesAndReadiness(m);
+        SweepByes();
+
+        Config.Save();
+    }
+
+    private void BuildDoubleElim()
+    {
+        Matches.Clear();
+        var seeded = Players.OrderBy(_ => Guid.NewGuid()).ToList();
+
+        var size = 1;
+        while (size < seeded.Count) size <<= 1;
+        var wbRounds = (int)Math.Log2(size);
+
+        // ---- Winners bracket ----
+        var wb = new List<List<DeathrollMatch>>();
+        var round1Count = size / 2;
+        var first = new List<DeathrollMatch>();
+        for (var i = 0; i < round1Count; i++)
+        {
+            var m = new DeathrollMatch { Round = 1, Position = i, State = MatchState.Pending, IsLosersBracket = false };
+            var aIdx = i * 2;
+            var bIdx = i * 2 + 1;
+            if (aIdx < seeded.Count) m.PlayerA = seeded[aIdx].Id;
+            if (bIdx < seeded.Count) m.PlayerB = seeded[bIdx].Id;
+            first.Add(m);
+        }
+        wb.Add(first);
+        var prev = round1Count;
+        for (var r = 2; r <= wbRounds; r++)
+        {
+            var count = prev / 2;
+            var list = new List<DeathrollMatch>();
+            for (var i = 0; i < count; i++)
+                list.Add(new DeathrollMatch { Round = r, Position = i, State = MatchState.Pending, IsLosersBracket = false });
+            wb.Add(list);
+            prev = count;
+        }
+        for (var r = 0; r < wb.Count - 1; r++)
+            for (var i = 0; i < wb[r].Count; i++)
+            {
+                wb[r][i].WinnerTo = wb[r + 1][i / 2].Id;
+                wb[r][i].WinnerToSlot = i % 2;
+            }
+
+        // ---- Losers bracket ----
+        var lb = new List<List<DeathrollMatch>>();
+        var lbRoundCount = Math.Max(1, 2 * (wbRounds - 1));
+        var sizes = new List<int>();
+        var cur = Math.Max(1, round1Count / 2);
+        for (var k = 0; k < lbRoundCount; k++)
+        {
+            sizes.Add(Math.Max(1, cur));
+            if (k % 2 == 1) cur = Math.Max(1, cur / 2);
+        }
+        var lbRoundNum = wbRounds + 1;
+        for (var k = 0; k < lbRoundCount; k++)
+        {
+            var list = new List<DeathrollMatch>();
+            for (var i = 0; i < sizes[k]; i++)
+                list.Add(new DeathrollMatch { Round = lbRoundNum, Position = i, State = MatchState.Pending, IsLosersBracket = true });
+            lb.Add(list);
+            lbRoundNum++;
+        }
+        for (var k = 0; k < lb.Count - 1; k++)
+        {
+            var curList = lb[k];
+            var nextList = lb[k + 1];
+            for (var i = 0; i < curList.Count; i++)
+            {
+                if (nextList.Count == curList.Count)
+                {
+                    curList[i].WinnerTo = nextList[i].Id;
+                    curList[i].WinnerToSlot = 1;
+                }
+                else
+                {
+                    curList[i].WinnerTo = nextList[i / 2].Id;
+                    curList[i].WinnerToSlot = i % 2;
+                }
+            }
+        }
+
+        // ---- Drop WB losers into the LB ----
+        for (var i = 0; i < wb[0].Count; i++)
+        {
+            var dest = lb[0][i / 2];
+            wb[0][i].LoserTo = dest.Id;
+            wb[0][i].LoserToSlot = i % 2;
+        }
+        for (var r = 1; r < wb.Count; r++)
+        {
+            var lbMinor = lb.ElementAtOrDefault(2 * r - 1);
+            if (lbMinor == null) continue;
+            for (var i = 0; i < wb[r].Count; i++)
+            {
+                var dest = lbMinor[Math.Min(i, lbMinor.Count - 1)];
+                wb[r][i].LoserTo = dest.Id;
+                wb[r][i].LoserToSlot = 0;
+            }
+        }
+
+        // ---- Grand final ----
+        var wbFinal = wb[^1][0];
+        var lbFinal = lb[^1][0];
+        var grandFinal = new DeathrollMatch { Round = lbRoundNum, Position = 0, State = MatchState.Pending, IsLosersBracket = false, BestOf = 3 };
+        wbFinal.WinnerTo = grandFinal.Id; wbFinal.WinnerToSlot = 0;
+        lbFinal.WinnerTo = grandFinal.Id; lbFinal.WinnerToSlot = 1;
+
+        foreach (var list in wb) Matches.AddRange(list);
+        foreach (var list in lb) Matches.AddRange(list);
+        Matches.Add(grandFinal);
+
+        foreach (var m in Matches)
+            ResolveByesAndReadiness(m);
+        SweepByes();
 
         Config.Save();
     }
@@ -173,14 +289,22 @@ public class DeathrollManager
         var hasA = m.PlayerA != null;
         var hasB = m.PlayerB != null;
 
-        if (m.Round == 1 && hasA != hasB)
+        if (hasA != hasB)
         {
-            // Bye: the present player advances automatically.
-            var winner = m.PlayerA ?? m.PlayerB;
-            m.Winner = winner;
-            m.State = MatchState.Done;
-            Advance(m);
-            return;
+            // One slot filled. It's a bye if the empty slot can never be filled:
+            // round 1 (no feeders), or every match feeding this one is already
+            // Done (so no further player can arrive).
+            var feedersDone = m.Round == 1 || Matches
+                .Where(x => x.Id != m.Id && (x.WinnerTo == m.Id || x.LoserTo == m.Id))
+                .All(x => x.State == MatchState.Done);
+            if (feedersDone)
+            {
+                var winner = m.PlayerA ?? m.PlayerB;
+                m.Winner = winner;
+                m.State = MatchState.Done;
+                Advance(m);
+                return;
+            }
         }
 
         if (hasA && hasB)
@@ -188,15 +312,64 @@ public class DeathrollManager
     }
 
     // Push a finished match's winner into its next match slot, then refresh that
-    // match's readiness (and cascade byes if needed).
+    // match's readiness (and cascade byes if needed). In double elimination,
+    // also drop the loser into their losers-bracket slot.
     private void Advance(DeathrollMatch m)
     {
-        if (m.WinnerTo == null || m.Winner == null) return;
-        var next = Matches.FirstOrDefault(x => x.Id == m.WinnerTo);
-        if (next == null) return;
-        if (m.WinnerToSlot == 0) next.PlayerA = m.Winner;
-        else next.PlayerB = m.Winner;
-        ResolveByesAndReadiness(next);
+        // Winner advances.
+        if (m.WinnerTo != null && m.Winner != null)
+        {
+            var next = Matches.FirstOrDefault(x => x.Id == m.WinnerTo);
+            if (next != null)
+            {
+                if (m.WinnerToSlot == 0) next.PlayerA = m.Winner;
+                else next.PlayerB = m.Winner;
+                ResolveByesAndReadiness(next);
+            }
+        }
+
+        // Loser drops (double elimination only).
+        if (m.LoserTo != null && m.Loser != null)
+        {
+            var drop = Matches.FirstOrDefault(x => x.Id == m.LoserTo);
+            if (drop != null)
+            {
+                if (m.LoserToSlot == 0) drop.PlayerA = m.Loser;
+                else drop.PlayerB = m.Loser;
+                ResolveByesAndReadiness(drop);
+            }
+        }
+
+        // Sweep: a feeder completing can turn a waiting one-player match into a
+        // bye (e.g. the feeder was itself a bye and sent no loser). Re-evaluate
+        // pending matches until nothing changes.
+        SweepByes();
+    }
+
+    private bool sweeping;
+
+    private void SweepByes()
+    {
+        if (sweeping) return; // re-entrancy guard: Advance can be called from within the sweep
+        sweeping = true;
+        try
+        {
+            for (var guard = 0; guard < 64; guard++)
+            {
+                var changed = false;
+                foreach (var x in Matches.Where(x => x.State == MatchState.Pending).ToList())
+                {
+                    var before = x.State;
+                    ResolveByesAndReadiness(x);
+                    if (x.State != before) changed = true;
+                }
+                if (!changed) return;
+            }
+        }
+        finally
+        {
+            sweeping = false;
+        }
     }
 
     // ---- Running matches ----

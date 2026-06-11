@@ -34,6 +34,8 @@ public sealed class Plugin : IDalamudPlugin
     public GiveawayTracker Giveaway { get; init; }
     public DeathrollManager Deathroll { get; init; }
     public BarGameService BarGames { get; init; }
+    public MenuService Menu { get; init; }
+    public ActionScheduler Scheduler { get; init; }
     public TradeWatcher TradeWatcher { get; init; }
     public HookManager HookManager { get; init; }
 
@@ -57,6 +59,8 @@ public sealed class Plugin : IDalamudPlugin
         Giveaway = new GiveawayTracker(this);
         Deathroll = new DeathrollManager(this);
         BarGames = new BarGameService(this);
+        Scheduler = new ActionScheduler();
+        Menu = new MenuService(this);
         TradeWatcher = new TradeWatcher(this);
         HookManager = new HookManager(this);
 
@@ -76,6 +80,7 @@ public sealed class Plugin : IDalamudPlugin
     {
         Counter.Update();
         TradeWatcher.Update();
+        Scheduler.Update();
     }
 
     private void DrawUI() => WindowSystem.Draw();

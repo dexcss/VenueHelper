@@ -22,6 +22,19 @@ public static unsafe class ChatSender
         if (string.IsNullOrWhiteSpace(text))
             return (false, "Message is empty.");
 
+        var trimmed = text.Trim();
+
+        // If the text is already a slash-command (e.g. /emote ..., /dance,
+        // /random), run it as-is rather than wrapping it in the channel command
+        // \u2014 otherwise "/say /emote ..." just says the literal text. The /em
+        // alias is normalized to /emote for reliability.
+        if (trimmed.StartsWith("/"))
+        {
+            if (trimmed.StartsWith("/em ", StringComparison.OrdinalIgnoreCase))
+                trimmed = "/emote " + trimmed[4..];
+            return Send(trimmed);
+        }
+
         var prefix = channel switch
         {
             ChatChannel.Say => "/say ",
@@ -31,7 +44,82 @@ public static unsafe class ChatSender
             _ => "/say ",
         };
 
-        return Send(prefix + text.Trim());
+        return Send(prefix + trimmed);
+    }
+
+    // What SendEmote would actually send, for UI previews.
+    public static string ResolveEmote(string text)
+    {
+        var trimmed = (text ?? string.Empty).Trim();
+        if (trimmed.Length == 0) return string.Empty;
+        if (!trimmed.StartsWith("/")) return "/emote " + trimmed;
+        if (trimmed.StartsWith("/em ", StringComparison.OrdinalIgnoreCase))
+            return "/emote " + trimmed[4..];
+        return trimmed;
+    }
+
+    // What will actually be sent, for tooltips. Pass channel=null for the emote
+    // rule (plain text -> /emote), or a channel for the say/yell/etc rule
+    // (plain text -> /channel, slash-commands run as-is).
+    public static string PreviewSend(string text, ChatChannel? channel)
+    {
+        var trimmed = (text ?? string.Empty).Trim();
+        if (trimmed.Length == 0) return string.Empty;
+
+        if (channel == null)
+            return ResolveEmote(trimmed);
+
+        if (trimmed.StartsWith("/"))
+        {
+            if (trimmed.StartsWith("/em ", StringComparison.OrdinalIgnoreCase))
+                return "/emote " + trimmed[4..];
+            return trimmed;
+        }
+        var prefix = channel switch
+        {
+            ChatChannel.Say => "/say ",
+            ChatChannel.Yell => "/yell ",
+            ChatChannel.Shout => "/shout ",
+            ChatChannel.Party => "/p ",
+            _ => "/say ",
+        };
+        return prefix + trimmed;
+    }
+
+    // Resolves a serve-step into the exact command to send. Anything starting
+    // with "/" is sent as typed (e.g. /say hi, /micon "x", /handover, /trade);
+    // the /em alias is normalized to /emote. Plain text becomes "/emote text".
+    public static string ResolveCommand(string text)
+    {
+        var trimmed = (text ?? string.Empty).Trim();
+        if (trimmed.Length == 0) return string.Empty;
+        if (!trimmed.StartsWith("/")) return "/emote " + trimmed;
+        if (trimmed.StartsWith("/em ", StringComparison.OrdinalIgnoreCase))
+            return "/emote " + trimmed[4..];
+        return trimmed;
+    }
+
+    // Sends an already-built command string exactly as given (assumed to start
+    // with the correct slash-command). Used by the serve scheduler.
+    public static (bool ok, string message) SendRaw(string command)
+    {
+        if (string.IsNullOrWhiteSpace(command))
+            return (false, "Empty command.");
+        return Send(command.Trim());
+    }
+
+    // Performs an emote. Two cases:
+    //  - Plain action text ("farts loudly")     -> sent as "/emote farts loudly"
+    //  - An explicit command ("/laugh", "/em x") -> sent as a command (the /em
+    //    alias is normalized to /emote for reliability via the chat-box API).
+    // This lets default emotes (/laugh, /dance, /sit) play their animation while
+    // free-form text still goes through /emote.
+    public static (bool ok, string message) SendEmote(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return (false, "Emote text is empty.");
+        var toSend = ResolveEmote(text);
+        return Send(toSend);
     }
 
     private static (bool ok, string message) Send(string message)

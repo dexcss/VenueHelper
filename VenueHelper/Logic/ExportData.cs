@@ -65,6 +65,75 @@ public static class ExportData
         return new TableData("Unique Visitors", new[] { "Name", "World" }, rows);
     }
 
+    // ---- Menu ----------------------------------------------------------
+
+    public static TableData MenuSales(IReadOnlyList<MenuSale> sales)
+    {
+        var rows = Enumerable.Reverse(sales)
+            .Select(s => (IReadOnlyList<string>)new List<string>
+            {
+                s.ItemName,
+                s.Price.ToString(),
+                s.Buyer ?? string.Empty,
+                s.When.ToString("yyyy-MM-dd HH:mm:ss"),
+            })
+            .ToList();
+        return new TableData("Menu Sales", new[] { "Item", "Price", "Buyer", "Time" }, rows);
+    }
+
+    public static TableData MenuTotals(IReadOnlyList<MenuSale> sales)
+    {
+        var rows = sales
+            .GroupBy(s => s.ItemName)
+            .Select(grp => (IReadOnlyList<string>)new List<string>
+            {
+                grp.Key,
+                grp.Count().ToString(),
+                grp.Sum(s => s.Price).ToString(),
+            })
+            .OrderByDescending(r => long.Parse(r[2]))
+            .ToList();
+        return new TableData("Menu Totals", new[] { "Item", "Sold", "Revenue" }, rows);
+    }
+
+    // ---- Bar Game ------------------------------------------------------
+
+    // Every captured roll with its result, newest first.
+    public static TableData BarGameHistory(BarGame g)
+    {
+        var rows = new List<IReadOnlyList<string>>();
+        for (var i = g.Plays.Count - 1; i >= 0; i--)
+        {
+            var p = g.Plays[i];
+            var result = BarGameService.IsComparative(g) ? "" : (p.Won ? "WIN" : "");
+            rows.Add(new List<string>
+            {
+                p.NameOnly,
+                p.Roll.ToString(),
+                $"/{(p.OutOf == 1000 ? "random" : "random " + p.OutOf)}",
+                result,
+                p.When.ToString("yyyy-MM-dd HH:mm:ss"),
+            });
+        }
+        return new TableData($"{g.Name} - Rolls", new[] { "Name", "Roll", "OutOf", "Result", "Time" }, rows);
+    }
+
+    // Per-player summary: gil paid, plays bought/used.
+    public static TableData BarGamePlayers(BarGame g)
+    {
+        var rows = g.Players.Values
+            .OrderByDescending(p => p.GilPaid)
+            .Select(p => (IReadOnlyList<string>)new List<string>
+            {
+                p.NameOnly,
+                p.GilPaid.ToString(),
+                p.PlaysBought(g.EntryCost).ToString(),
+                p.PlaysUsed.ToString(),
+            })
+            .ToList();
+        return new TableData($"{g.Name} - Players", new[] { "Name", "GilPaid", "PlaysBought", "PlaysUsed" }, rows);
+    }
+
     // ---- Auction -------------------------------------------------------
 
     public static TableData AuctionHistory(IReadOnlyList<AuctionRecord> history)

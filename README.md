@@ -1,87 +1,121 @@
 # Venue Helper
 
-An all-in-one Dalamud plugin for FFXIV venue hosts, combining four tools into one tabbed window. Open it with `/venuehelper` (aliases `/vhelp`, `/vh`).
+An all-in-one Dalamud plugin for FFXIV venue hosts, combining attendance tracking, raffles, auctions, giveaways, deathroll tournaments, bar games, restaurant menus, and quick announcements into one tabbed window.
 
-Built from parts of the reference plugins provided:
-- **Venue Counter** reuses the object-table scanning approach from **Venue Manager** (the `IPlayerCharacter` / `SubKind == 4` player filter).
-- **Raffle Helper** reuses **Elementalist**'s `TradeWatcher` (trade-completion detection via the `TradeOpen` condition flag plus `TradeNumberArray`/`TradeStringArray`).
-- **Auction Helper** reuses **Carnival Eorzea**'s target-a-player + note + history + export pattern.
-- **Giveaway Helper** reuses **Elementalist**'s `/random` + `/dice` log hook to capture rolls.
+Open it with `/venuehelper` (aliases `/vhelp`, `/vh`).
 
 ---
 
-## Exports (all tabs)
+## Installation
 
-Each tab has an **Export** button in the top-right corner. It opens a small popup with the **format** (TXT by default, plus CSV, PDF, XLSX), the **destination folder** (paste any full path; blank = default plugin folder, remembered between sessions), and a **Save**/**Copy** row for each dataset that tab can export.
+In-game, open `/xlsettings` → **Experimental** → **Custom Plugin Repositories**, add this URL, and click the **+** then the **save** (floppy) icon:
+
+```
+https://raw.githubusercontent.com/dexcss/VenueHelper/main/repo.json
+```
+
+Then open `/xlplugins`, search for **Venue Helper**, and install.
+
+---
+
+## Exports
+
+Most tabs have an **Export** button in the top-right corner. It opens a popup with the **format** (TXT, CSV, PDF, or XLSX), a **destination folder** (paste any full path; blank = default plugin folder, remembered between sessions), and **Save**/**Copy** options for each dataset.
 
 - TXT/CSV are plain text (CSV includes a UTF-8 BOM so Excel opens it cleanly).
-- XLSX is a real spreadsheet (via ClosedXML), with numeric cells written as numbers.
-- PDF is a formatted table (via QuestPDF, Community license).
-
-## Tab 1 — Venue Counter
-
-Two counters share a single per-second scan of everyone rendered around you, so both can run at once. FFXIV only renders ~99 players at a time, so a single snapshot undercounts a packed venue; walking the room with a counter running catches everyone as they stream into render range, keyed by `Name@World` so nobody is double-counted.
-
-- **Temporary Counter** — Start, walk one lap, Stop to freeze a clean headcount.
-- **All-Night Counter** — a running tally of unique visitors for the whole night, persisted across relogs. Pause/Resume continues the same total; Reset starts fresh.
-- Export the full unique-visitor list (Name, World) in any format.
-
-## Tab 2 — Raffle Helper
-
-Tracks raffle participants by name and world, with automatic trade detection.
-
-- Set the **ticket cost** (gil per ticket); ticket counts are computed from gil paid / cost, with +/- nudges per player.
-- **Auto-credit incoming trades** adds received gil to a player's buy-in (toggleable); a manual *Add / Credit Gil* field is the fallback.
-- **Add Targeted Player** or type `Name@World`.
-- **Assign 1-999** sequentially or **shuffled**, capped at 999 total.
-- Two export rows: the **ticket list** (one line per ticket, ideal for https://wheelofnames.com/ ) and the **summary** (one row per player). Both support TXT/CSV/PDF/XLSX.
-
-## Tab 3 — Auction Helper
-
-For auctioning players off (gpose, art, etc.).
-
-- **Add Targeted Player** (or by name); set the **note** and the **Won By** (winning bidder) inline in the table.
-- Type the **final sale price**, then hit **Sold** to move it into history.
-- The **Won By** field records who won the item, e.g. "Person X won for XYZ gil"; it shows in history and exports.
-- **House cut %** (whole numbers) is captured per-sale at finalize time.
-- **History & Totals** shows each sale's price, cut %, house cut, and seller payout, plus running totals (total gil through the house, house made, paid out). Export in any format.
-- **Reset Active List** and **Clear History** both confirm with an "Are you sure?" prompt.
-
-## Tab 4 — Giveaway Helper
-
-Start a round; only each player's **first** `/random` (or `/dice`) after Start counts toward winners. Every roll is also shown in a verification feed.
-
-- Pick one or more winner modes: **Highest**, **Lowest**, and/or **Closest to** a target number (multi-select — e.g. show highest *and* lowest for a two-prize giveaway).
-- Or switch on **Roll until someone hits a number (race)**: every roll counts and the first person to roll the exact target wins (auto-stops on the hit).
-- Start / Stop / Reset (Reset confirms first).
-- Winner banner(s) update live; the counted-rolls table highlights winners in gold, and the feed marks later rolls as "(later roll)" so you can verify.
-- Export the counted rolls in any format.
+- XLSX is a real spreadsheet, with numeric cells written as numbers.
+- PDF is a formatted table.
 
 ---
 
-## Crash protection
+## Venue Counter
 
-Everything is saved to disk as you go, so a game crash or relog loses nothing. The all-night visitor count, raffle entries and buy-ins, the active auction list and history, and an in-progress giveaway (its rolls, feed, running state, and mode selection) all persist and come back exactly as they were. Lists are only emptied when you explicitly clear/reset them (each destructive reset asks "Are you sure?" first).
+Counts unique visitors. FFXIV only renders ~99 characters at once, so a single snapshot undercounts a packed venue; walking the room with a counter running catches everyone as they stream into render range, keyed by `Name@World` so nobody is double-counted.
+
+- **Temporary (lap) counter** — Start, walk one lap, Stop for a clean headcount.
+- **All-night counter** — a running tally of unique visitors for the whole night, persisted across relogs.
+- **Multiple venues** — run more than one venue? Add a venue from the dropdown and each keeps its own visitor list and records, switchable at any time.
+- **Time in venue (lifetime)** — while the all-night counter runs, it accumulates the total time each visitor has spent in your venue across nights (e.g. *Akari Zanto — 21H 31M*). Click any name for a per-visit breakdown showing when they arrived and left.
+- Export the unique-visitor list in any format.
+
+## Raffle Helper
+
+Tracks raffle participants by name and world.
+
+- **Enter ticket counts** directly per player, with +/- adjustments.
+- **Free / comp tickets** — give a player tickets that enter the draw but don't add to the pot.
+- **Player notes** (e.g. Discord names) — kept in the summary export, never in the public wheel list.
+- **House cut %** for split raffles (e.g. 80/20), with a live pot/house/winner summary.
+- **Auto-assign numbers 0-999** (sequential or shuffled). If the draw exceeds 1000 tickets, numbers are left blank so you can use an external wheel.
+- **Import a name list** from your clipboard (comma or newline separated).
+- **Auto-credit trades** — incoming trade gil can be converted to tickets automatically (toggleable).
+- Two exports: the **ticket list** (one name per ticket, ideal for [wheelofnames.com](https://wheelofnames.com/), name-only so nothing private leaks) and a **summary** (one row per player, with notes).
+
+## Auction Helper
+
+For auctioning items, gpose, art, mounts, and more.
+
+- **Add a player** by target or name; set the **note** and **Won By** inline.
+- **Sold to target** — one click fills the winner with your current target.
+- **Record sales**, including negative **"sold to the house"** sales (enter a negative price; no house cut is taken).
+- **House cut %** captured per sale.
+- **History with date filter** — filter the sale history by date range so you never have to clear it, and export just a window instead of everything.
+- **Buyer tracking** — track a buyer across their alts by listing their alias names, then see their total spend across all of them.
+- **Import a name list** from your clipboard.
+
+## Giveaway Helper
+
+Start a round; each player's **first** `/random` (or `/dice`) counts.
+
+- Pick one or more winner modes: **Highest**, **Lowest**, and/or **Closest to** a target.
+- Or use **exact-match (race)** mode: every roll counts and the first to hit the target wins.
+- Every roll is shown for verification; winners are highlighted.
+
+## DR Tourny Helper
+
+Run a deathroll tournament bracket in **single or double elimination**.
+
+- Pick single elimination (lose once, you're out) or double elimination (lose twice — a winners bracket, a losers bracket, and a grand final).
+- Randomized seeding with byes.
+- Automatic roll detection (open with `/random`, roll down each turn; roll a 1 to lose, a 0 to win instantly).
+- **Roll-offs** to decide who goes first, strict turn/range validation with rejected-roll logging, and **best-of-3 finals**.
+- Manual winner override for edge cases.
+
+## Shout/Yell Helper
+
+Pre-write announcements (start with three, add or remove as many as you like), each with its own channel (Say / Yell / Shout / Party), and fire any of them with one click. Great for repeating venue info, rules, and event calls.
+
+## Bar Game Helper
+
+Build your own roll games and run them live.
+
+- **Configure** the roll (`/random`, `/random N`, or `/dice N`), the win condition, an entry cost, an optional stacking pot, and the prize (a fixed gil amount or a percentage of the pot).
+- **Win conditions:** specific number(s), a range, highest, lowest, closest-to, or **survival** — a streak of successes in a row.
+- **Survival games** come in three flavours: roll the same number each time, roll higher/lower than a set number, or call higher/lower against your previous roll. Payouts can be **fixed** (reach a streak, win the pot), **tiered** (bank gil for each success past a threshold), or **high score** (longest streak wins the pot). Each player's run shows live, with the leader highlighted.
+- **Capture live** — start capturing and the plugin reads trades as buy-ins (one buy-in per entry cost) and reads players' rolls, flagging winners automatically. Add buy-ins manually (paid or free) by target or name, and manually enter a roll for someone who rolled early.
+- **Announce** the rules to any chat channel in one click, with the prize shown as the actual gil amount.
+
+## Menu Helper
+
+Run a venue menu like a restaurant.
+
+- **Menu profiles** — keep a separate menu per venue and switch between them; each has its own items, macros, and the night's sales.
+- **Items** have a name, price, and a **serve sequence** — a list of emotes/commands, each with its own wait, performed in order when you serve the item (just like a macro's `<wait.N>` lines). Plain text becomes an `/emote`; anything starting with `/` (e.g. `/handover`, `/micon`, `/trade`) is sent as-is.
+- **Serving** records the sale (optionally to a named guest) and fires the sequence for you. The "Tonight's Till" banner tracks revenue and orders for the active menu, with an order log and export.
+- **Additional Macros** — reusable macro buttons (same multi-step sequences, no price) for adverts, menu hand-overs, and anything else you'd normally keep as a game macro.
+
+---
+
+## Persistence
+
+Everything is saved to disk as you go, so a crash or relog loses nothing — visitor counts, time tracking, raffle entries, auction lists and history, bar games, presets, and in-progress events all persist. Lists are only emptied when you explicitly clear/reset them, and destructive resets ask for confirmation first.
 
 ## Building
 
-Standard Dalamud plugin (`Dalamud.NET.Sdk/15.0.0`, `net10.0-windows`). With XIVLauncher/Dalamud installed, open `VenueHelper.sln` or run `dotnet build -c Release`. NuGet restore pulls **ClosedXML** (XLSX) and **QuestPDF** (PDF). The output `VenueHelper.dll` loads as a dev plugin.
-
----
-
-## Credits & attribution
-
-Venue Helper is built on patterns and code adapted from several open-source FFXIV Dalamud plugins. Huge thanks to their authors:
-
-- **Venue Manager** — object-table player-scanning approach used by the Venue Counter. (AGPL-3.0)
-- **Elementalist** — the trade-detection `TradeWatcher` (raffle buy-ins) and the `/random` / `/dice` log hook (Giveaway Helper).
-- **Carnival Eorzea** — the target-a-player + note + history + export pattern (Auction Helper).
-- **Lalakuza Dice** — additional roll-handling reference.
-
-If you are one of these authors and have concerns about attribution or licensing, please open an issue.
+Standard Dalamud plugin (`Dalamud.NET.Sdk/15.0.0`, `net10.0-windows`, API level 15). With XIVLauncher/Dalamud installed, run `dotnet build -c Release`. The output `VenueHelper.dll` loads as a dev plugin.
 
 ## License
 
-This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**, in keeping with the license of Venue Manager, from which it adapts code. See [LICENSE](LICENSE) for the full text.
+This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**. See [LICENSE](LICENSE) for the full text.
 
 In short: you're free to use, modify, and redistribute this software, but derivative works must also be AGPL-3.0 and make their source available.

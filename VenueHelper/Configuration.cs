@@ -32,6 +32,7 @@ public class Configuration : IPluginConfiguration
     public int ActiveVenue = 0;
     // Set once the legacy single-venue data has been migrated into Venues[].
     public bool VenuesMigrated = false;
+    public bool MenuMigrated = false;
 
     // ---- Raffle Helper -------------------------------------------------
     public List<RaffleEntry> RaffleEntries = new();
@@ -57,6 +58,18 @@ public class Configuration : IPluginConfiguration
     // ---- Bar Game Helper -----------------------------------------------
     public List<BarGame> BarGames = new();
     public int SelectedBarGame = 0;
+
+    // ---- Menu Helper ---------------------------------------------------
+    // Menu profiles (e.g. one per venue). Each holds its own items + macros.
+    public List<MenuProfile> MenuProfiles = new();
+    public int SelectedMenuProfile = 0;
+    public List<MenuSale> MenuSales = new();   // sales are global for the night
+    // Legacy flat fields (migrated into the first profile on load).
+    public List<MenuItem> MenuItems = new();
+    public bool MenuConfirmServe = false;
+    public int MenuServeStepDelayMs = 1200;
+    public List<QuickAction> QuickEmotes = new();
+    public List<QuickAction> QuickSays = new();
 
     // ---- Giveaway Helper -----------------------------------------------
     // Persisted so a crash mid-giveaway doesn't lose the rolls. Cleared only
@@ -87,6 +100,62 @@ public class Configuration : IPluginConfiguration
     {
         this.pluginInterface = pi;
         MigrateVenues();
+        MigrateMenu();
+    }
+
+    // Ensure there's at least one menu profile, and migrate any legacy flat
+    // menu items into it so existing users keep their menu.
+    private void MigrateMenu()
+    {
+        // Run the legacy import at most once, ever. Without this guard, the old
+        // QuickEmotes/QuickSays could be re-imported as macros on a later load,
+        // duplicating them.
+        if (!MenuMigrated)
+        {
+            if (MenuProfiles.Count == 0)
+            {
+                var profile = new MenuProfile("Default Menu");
+                if (MenuItems.Count > 0)
+                {
+                    profile.Items = MenuItems;
+                    MenuItems = new List<MenuItem>();
+                }
+                // Carry over old emote/say quick buttons as simple one-step macros.
+                foreach (var qa in QuickEmotes.Concat(QuickSays))
+                {
+                    if (string.IsNullOrWhiteSpace(qa.Label) || string.IsNullOrWhiteSpace(qa.Text)) continue;
+                    profile.Macros.Add(new MenuMacro(qa.Label)
+                    {
+                        Steps = { new ServeStep(qa.Text, 1.0f) },
+                    });
+                }
+                if (MenuSales.Count > 0)
+                {
+                    profile.Sales = MenuSales;
+                    MenuSales = new List<MenuSale>();
+                }
+                MenuProfiles.Add(profile);
+            }
+            // Clear the legacy sources so they can never be re-imported.
+            QuickEmotes.Clear();
+            QuickSays.Clear();
+            MenuMigrated = true;
+        }
+
+        if (MenuProfiles.Count == 0)
+            MenuProfiles.Add(new MenuProfile("Default Menu"));
+        if (SelectedMenuProfile < 0 || SelectedMenuProfile >= MenuProfiles.Count)
+            SelectedMenuProfile = 0;
+    }
+
+    public MenuProfile ActiveMenuProfile
+    {
+        get
+        {
+            if (MenuProfiles.Count == 0) MenuProfiles.Add(new MenuProfile("Default Menu"));
+            if (SelectedMenuProfile < 0 || SelectedMenuProfile >= MenuProfiles.Count) SelectedMenuProfile = 0;
+            return MenuProfiles[SelectedMenuProfile];
+        }
     }
 
     // One-time move of the legacy single-venue data into a default VenueProfile,

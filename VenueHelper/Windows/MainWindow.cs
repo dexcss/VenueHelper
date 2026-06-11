@@ -80,6 +80,11 @@ public partial class MainWindow : Window, IDisposable
                 DrawBarGameTab();
                 ImGui.EndTabItem();
             }
+            if (ImGui.BeginTabItem("Menu Helper"))
+            {
+                DrawMenuTab();
+                ImGui.EndTabItem();
+            }
             ImGui.EndTabBar();
         }
     }

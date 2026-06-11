@@ -14,6 +14,24 @@ public enum WinCondition
     Highest,          // highest roll among players wins
     Lowest,           // lowest roll among players wins
     ClosestTo,        // closest to a target number wins
+    SurvivalStreak,   // hit a success number N times in a row (e.g. six 1s); a
+                      // miss ends the run
+}
+
+// The three survival sub-modes.
+public enum SurvivalMode
+{
+    SameNumber,   // each roll must equal a success number (e.g. roll a 1)
+    StaticHL,     // each roll must be higher/lower than a fixed threshold
+    DynamicHL,    // each roll must beat the previous roll in the called direction
+}
+
+// How a survival game pays out.
+public enum SurvivalPrize
+{
+    Fixed,      // reach StreakNeeded in a row -> flat PrizeGil / pot
+    Tiered,     // each success past a threshold pays a per-step amount
+    HighScore,  // best streak wins the pot (fixed or stacking) when host ends it
 }
 
 public enum PrizeKind
@@ -39,6 +57,19 @@ public class BarGame
     public int RangeLow = 1;                    // for InRange
     public int RangeHigh = 10;                  // for InRange
     public int ClosestTarget = 50;              // for ClosestTo
+    // For SurvivalStreak: roll must equal one of WinningNumbers (the "success"
+    // value, e.g. 1) StreakNeeded times in a row to win; any other roll ends it.
+    public int StreakNeeded = 6;
+    public SurvivalMode Survival = SurvivalMode.SameNumber;
+    // Static higher/lower mode: each roll must be higher (or lower) than this.
+    public int StaticThreshold = 5;
+    public bool StaticHigher = true;     // true = must roll higher, false = lower
+    // Prize style for survival:
+    public SurvivalPrize SurvivalPrizeKind = SurvivalPrize.Fixed;
+    // Tiered: once past TierThreshold successes, each further success pays
+    // TierPerStep gil (paid out at TierThreshold + n).
+    public int TierThreshold = 3;
+    public long TierPerStep = 100000;
 
     // Cost & pot.
     public long EntryCost = 0;          // gil per play (buy-in)
