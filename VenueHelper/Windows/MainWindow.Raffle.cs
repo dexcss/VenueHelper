@@ -26,16 +26,14 @@ public partial class MainWindow
                 () => ExportData.RaffleList(Raffle.Entries)),
             new ExportItem("Summary (1 row per player, includes notes)", "raffle_summary",
                 () => ExportData.RaffleSummary(Raffle.Entries)));
-        ImGui.TextColored(Grey, "Enter how many tickets each player bought, then assign 0-999 for the draw.");
+        WrapText(Grey, "Enter how many tickets each player bought, then assign 0-999 for the draw.");
 
         // Warn if a bar game is currently capturing trades \u2014 they'd be taken as
         // bar-game buy-ins instead of raffle tickets.
         var activeGame = Plugin.BarGames.ActiveTrackingGame;
         if (activeGame != null)
         {
-            ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + SW(560));
-            ImGui.TextColored(Red, $"Heads up: the Bar Game \"{activeGame.Name}\" is capturing trades right now, so incoming trades will count as its buy-ins, NOT raffle tickets. Stop that game's capture before running a trade-based raffle.");
-            ImGui.PopTextWrapPos();
+            WrapText(Red, $"Heads up: the Bar Game \"{activeGame.Name}\" is capturing trades right now, so incoming trades will count as its buy-ins, NOT raffle tickets. Stop that game's capture before running a trade-based raffle.");
         }
 
         ImGuiHelpers.ScaledDummy(6f);
@@ -199,7 +197,7 @@ public partial class MainWindow
         if (pot > 0)
         {
             var cut = (long)(pot * Raffle.HouseCutPercent / 100f);
-            ImGui.TextColored(Grey, $"Estimated pot: {pot:N0} gil   |   House ({Raffle.HouseCutPercent:0}%): {cut:N0}   |   Winner: {pot - cut:N0}");
+            WrapText(Grey, $"Estimated pot: {pot:N0} gil   |   House ({Raffle.HouseCutPercent:0}%): {cut:N0}   |   Winner: {pot - cut:N0}");
         }
 
         ImGuiHelpers.ScaledDummy(4f);
@@ -286,7 +284,7 @@ public partial class MainWindow
                 }
 
                 ImGui.TableNextColumn();
-                ImGui.TextColored(Grey, e.TicketNumbers.Count > 0 ? string.Join(", ", e.TicketNumbers) : "-");
+                WrapText(Grey, e.TicketNumbers.Count > 0 ? string.Join(", ", e.TicketNumbers) : "-");
 
                 ImGui.TableNextColumn();
                 if (ImGuiComponents.IconButton(FontAwesomeIcon.Trash))

@@ -23,6 +23,15 @@ public partial class MainWindow : Window, IDisposable
     // at high-DPI / high-scale setups like 4K at 230%.
     internal static float SW(float width) => width * ImGuiHelpers.GlobalScale;
 
+    // Draws colored text that wraps to the window width instead of running off
+    // the right edge. Use for any multi-word descriptive/help line.
+    private static void WrapText(Vector4 color, string text)
+    {
+        ImGui.PushTextWrapPos(0f); // 0 = wrap at the window's right edge
+        ImGui.TextColored(color, text);
+        ImGui.PopTextWrapPos();
+    }
+
     // Transient status line shown per tab.
     private string statusMessage = string.Empty;
     private Vector4 statusColor = Grey;

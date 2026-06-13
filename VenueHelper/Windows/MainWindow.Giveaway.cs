@@ -99,7 +99,7 @@ public partial class MainWindow
             ImGui.PopStyleColor();
             var since = DateTime.Now - Give.StartedAt;
             ImGui.SameLine();
-            ImGui.TextColored(Green, $"LIVE  {(int)since.TotalMinutes:00}:{since.Seconds:00}  \u2014  {Give.Count} rolls");
+            WrapText(Green, $"LIVE  {(int)since.TotalMinutes:00}:{since.Seconds:00}  \u2014  {Give.Count} rolls");
         }
         ImGui.SameLine();
         if (ImGui.Button("Reset##giveaway"))
@@ -137,7 +137,7 @@ public partial class MainWindow
             if (Give.Modes.HasFlag(GiveawayMode.Lowest) && Give.Lowest is { } lo)
                 ImGui.TextColored(Gold, $"Lowest:   {lo.NameOnly}  rolled {lo.Roll}");
             if (Give.Modes.HasFlag(GiveawayMode.Closest) && Give.Closest is { } cl)
-                ImGui.TextColored(Gold, $"Closest to {Give.ClosestTarget}:  {cl.NameOnly}  rolled {cl.Roll}");
+                WrapText(Gold, $"Closest to {Give.ClosestTarget}:  {cl.NameOnly}  rolled {cl.Roll}");
             if (Give.Modes == GiveawayMode.None)
                 ImGui.TextColored(Grey, "Select at least one winner mode above.");
         }
@@ -191,7 +191,7 @@ public partial class MainWindow
         }
 
         if (Give.Count == 0)
-            ImGui.TextColored(Grey, Give.Running ? "Waiting for rolls..." : "Start a giveaway, then have people roll.");
+            WrapText(Grey, Give.Running ? "Waiting for rolls..." : "Start a giveaway, then have people roll.");
 
         ImGuiHelpers.ScaledDummy(6f);
 

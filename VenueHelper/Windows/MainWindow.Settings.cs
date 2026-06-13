@@ -121,9 +121,7 @@ public partial class MainWindow
         ImGuiHelpers.ScaledDummy(10f);
 
         ImGui.TextColored(Blue, "Restore from a backup");
-        ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + SW(560));
-        ImGui.TextColored(Red, "Restoring REPLACES all current data with the file's contents. Make a backup first if unsure.");
-        ImGui.PopTextWrapPos();
+        WrapText(Red, "Restoring REPLACES all current data with the file's contents. Make a backup first if unsure.");
         ImGui.SetNextItemWidth(SW(440));
         ImGui.InputTextWithHint("##restorepath", "Full path to a VenueHelper-backup-*.json", ref restorePath, 400);
         ImGui.SameLine();

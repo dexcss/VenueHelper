@@ -47,6 +47,9 @@ public class MenuService
     public MenuItem AddItem(string name)
     {
         var item = new MenuItem(string.IsNullOrWhiteSpace(name) ? "New Item" : name.Trim());
+        // Start with one empty serve step so the sequence is visible and ready to
+        // fill in (mirrors how Additional Macros start).
+        item.ServeSteps.Add(new ServeStep(string.Empty, 1.0f));
         Profile.Items.Add(item);
         Config.Save();
         return item;

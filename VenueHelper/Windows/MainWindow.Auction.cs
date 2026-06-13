@@ -30,7 +30,7 @@ public partial class MainWindow
 
         DrawTabHeader("Auction Helper", "##export_auction",
             new ExportItem("Auction history", "auction_history", () => ExportData.AuctionHistory(Auction.History)));
-        ImGui.TextColored(Grey, "Target a player to put them up for auction, note what they're offering, then record the sale.");
+        WrapText(Grey, "Target a player to put them up for auction, note what they're offering, then record the sale.");
 
         ImGuiHelpers.ScaledDummy(6f);
 
@@ -272,9 +272,9 @@ public partial class MainWindow
     private void DrawAuctionHistory()
     {
         // ---- Totals summary -------------------------------------------
-        ImGui.TextColored(Gold, $"Total gil through the house: {Auction.TotalGilThroughHouse:N0}");
+        WrapText(Gold, $"Total gil through the house: {Auction.TotalGilThroughHouse:N0}");
         ImGui.TextColored(Green, $"House made (cut): {Auction.TotalHouseCut:N0}");
-        ImGui.TextColored(Grey, $"Paid out to sellers: {Auction.TotalPayouts:N0}   |   Sales recorded: {Auction.History.Count}");
+        WrapText(Grey, $"Paid out to sellers: {Auction.TotalPayouts:N0}   |   Sales recorded: {Auction.History.Count}");
 
         ImGuiHelpers.ScaledDummy(4f);
 
@@ -423,7 +423,7 @@ public partial class MainWindow
     private void DrawBuyers()
     {
         ImGui.TextColored(Blue, "Track a buyer across their alts");
-        ImGui.TextColored(Grey, "Add a buyer, then list the names/alts they bid under. Spend is summed from history across all their aliases.");
+        WrapText(Grey, "Add a buyer, then list the names/alts they bid under. Spend is summed from history across all their aliases.");
 
         ImGuiHelpers.ScaledDummy(4f);
         ImGui.SetNextItemWidth(SW(200));
@@ -457,7 +457,7 @@ public partial class MainWindow
 
                 // Aliases as removable chips.
                 if (b.Aliases.Count == 0)
-                    ImGui.TextColored(Grey, "No aliases yet \u2014 add the names this buyer bids under.");
+                    WrapText(Grey, "No aliases yet \u2014 add the names this buyer bids under.");
                 string? removeAlias = null;
                 foreach (var a in b.Aliases)
                 {

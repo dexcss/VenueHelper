@@ -82,7 +82,7 @@ public partial class MainWindow
             ImGui.PopStyleColor();
             if (ImGui.BeginPopup("##removevenue"))
             {
-                ImGui.TextColored(Red, $"Remove \"{Counter.ActiveVenueName}\" and all its records?");
+                WrapText(Red, $"Remove \"{Counter.ActiveVenueName}\" and all its records?");
                 if (ImGui.Button("Yes, remove"))
                 {
                     Counter.RemoveVenue(Plugin.Configuration.ActiveVenueProfile);
@@ -101,7 +101,7 @@ public partial class MainWindow
         ImGui.TextColored(Grey,
             "FFXIV only renders ~99 players at once. Walk the venue with a counter running and " +
             "every new person who loads in gets added to the running total.");
-        ImGui.TextColored(Grey, $"Currently visible to you: {Counter.CurrentlyVisible} players");
+        WrapText(Grey, $"Currently visible to you: {Counter.CurrentlyVisible} players");
 
         ImGuiHelpers.ScaledDummy(8f);
         ImGui.Separator();
@@ -109,7 +109,7 @@ public partial class MainWindow
 
         // ---- Temporary lap counter ------------------------------------
         ImGui.TextColored(Blue, "Temporary Counter (single sweep)");
-        ImGui.TextColored(Grey, "Start, walk a lap of the venue, then Stop to freeze the headcount.");
+        WrapText(Grey, "Start, walk a lap of the venue, then Stop to freeze the headcount.");
         ImGuiHelpers.ScaledDummy(2f);
 
         if (Counter.TempRunning)
@@ -151,18 +151,18 @@ public partial class MainWindow
 
         // ---- All night counter ----------------------------------------
         ImGui.TextColored(Blue, "All-Night Counter (running total)");
-        ImGui.TextColored(Grey, "Tracks unique visitors for the whole night. Survives relogs until you reset it.");
+        WrapText(Grey, "Tracks unique visitors for the whole night. Survives relogs until you reset it.");
         ImGuiHelpers.ScaledDummy(2f);
 
         ImGui.TextColored(Gold, $"Total unique visitors tonight: {Counter.AllNightTotal}");
         if (Counter.AllNightRunning)
         {
             var since = DateTime.Now - Counter.AllNightStarted;
-            ImGui.TextColored(Green, $"Tracking active \u2014 since {Counter.AllNightStarted:HH:mm} ({(int)since.TotalHours}h {since.Minutes}m)");
+            WrapText(Green, $"Tracking active \u2014 since {Counter.AllNightStarted:HH:mm} ({(int)since.TotalHours}h {since.Minutes}m)");
         }
         else if (Counter.AllNightTotal > 0)
         {
-            ImGui.TextColored(Grey, "Paused. Resume to keep adding to the same total, or reset to start fresh.");
+            WrapText(Grey, "Paused. Resume to keep adding to the same total, or reset to start fresh.");
         }
         ImGuiHelpers.ScaledDummy(2f);
 
@@ -211,7 +211,7 @@ public partial class MainWindow
         }
 
         ImGuiHelpers.ScaledDummy(6f);
-        ImGui.TextColored(Grey, "Tip: both counters run off the same scan, so you can run a lap while the all-night total keeps going. Use the Export button (top right) to save the visitor list.");
+        WrapText(Grey, "Tip: both counters run off the same scan, so you can run a lap while the all-night total keeps going. Use the Export button (top right) to save the visitor list.");
 
         ImGuiHelpers.ScaledDummy(8f);
         ImGui.Separator();
@@ -272,9 +272,7 @@ public partial class MainWindow
             else
             {
                 ImGui.Separator();
-                ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + SW(360));
-                ImGui.TextColored(Red, "ARE YOU REALLY SURE? EVERYTHING YOU HAVE RECORDED WILL BE GONE FOREVER.");
-                ImGui.PopTextWrapPos();
+                WrapText(Red, "ARE YOU REALLY SURE? EVERYTHING YOU HAVE RECORDED WILL BE GONE FOREVER.");
                 ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.6f, 0.1f, 0.1f, 1f));
                 if (ImGui.Button("Yes, delete everything"))
                 {
@@ -332,10 +330,8 @@ public partial class MainWindow
                 if (ImGui.BeginPopup($"##sessions{key}"))
                 {
                     ImGui.TextColored(Gold, $"{nm} \u2014 visit breakdown");
-                    ImGui.TextColored(Grey, $"Total: {VenueHelper.Logic.VenueCounter.FormatDuration(secs)}");
-                    ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + SW(360));
-                    ImGui.TextColored(Grey, "A departure is confirmed after they've been unseen for 30 minutes; the 'left' time shown is when you actually stopped seeing them.");
-                    ImGui.PopTextWrapPos();
+                    WrapText(Grey, $"Total: {VenueHelper.Logic.VenueCounter.FormatDuration(secs)}");
+                    WrapText(Grey, "A departure is confirmed after they've been unseen for 30 minutes; the 'left' time shown is when you actually stopped seeing them.");
                     ImGui.Separator();
                     var sessions = Counter.SessionsFor(key);
                     if (sessions.Count == 0)

@@ -66,7 +66,7 @@ public partial class MainWindow
             ImGui.PopStyleColor();
             if (ImGui.BeginPopup("##delmenuprofile"))
             {
-                ImGui.TextColored(Red, $"Delete the menu \"{Menu.Profile.Name}\" and its items/macros?");
+                WrapText(Red, $"Delete the menu \"{Menu.Profile.Name}\" and its items/macros?");
                 if (ImGui.Button("Yes, delete"))
                 {
                     Menu.RemoveProfile(Menu.Profile);
@@ -89,7 +89,7 @@ public partial class MainWindow
             ImGui.AlignTextToFramePadding();
             ImGui.TextColored(Green, $"{Menu.TotalRevenue:N0} gil");
             ImGui.SameLine(0, 16);
-            ImGui.TextColored(Grey, $"across {Menu.TotalSales} order{(Menu.TotalSales == 1 ? "" : "s")}");
+            WrapText(Grey, $"across {Menu.TotalSales} order{(Menu.TotalSales == 1 ? "" : "s")}");
         }
         ImGui.EndChild();
         ImGui.PopStyleColor();
@@ -141,7 +141,7 @@ public partial class MainWindow
 
         if (Menu.Items.Count == 0)
         {
-            ImGui.TextColored(Grey, "No menu items yet. Click \"Edit menu\" to add your drinks and dishes.");
+            WrapText(Grey, "No menu items yet. Click \"Edit menu\" to add your drinks and dishes.");
             DrawMenuSalesLog();
             return;
         }
@@ -308,7 +308,7 @@ public partial class MainWindow
                 ImGui.SetNextItemWidth(SW(150));
                 if (ImGui.InputInt("Price (gil)", ref price, 100, 1000)) { item.Price = Math.Max(0, price); Menu.Save(); }
 
-                ImGui.TextColored(Grey, "Serve sequence (this item's macro) \u2014 runs automatically when you press Serve. Each step is a command/emote with a wait (seconds) after it. Plain text becomes /emote; anything starting with / (e.g. /say, /micon, /handover, /trade) is sent as-is.");
+                WrapText(Grey, "Serve sequence (this item's macro) \u2014 runs automatically when you press Serve. Each step is a command/emote with a wait (seconds) after it. Plain text becomes /emote; anything starting with / (e.g. /say, /micon, /handover, /trade) is sent as-is.");
                 int? stepRemove = null;
                 ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(4f, 2f));
                 ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(6f, 3f));
@@ -319,7 +319,11 @@ public partial class MainWindow
                     ImGui.TextColored(Grey, $"{s + 1}.");
                     ImGui.SameLine();
                     var cmd = step.Command;
-                    ImGui.SetNextItemWidth(SW(360));
+                    // Flex the command box so the trailing controls (wait, Test,
+                    // up, X) stay on-screen on narrower windows.
+                    var trailing = SW(260);
+                    var cmdW = Math.Max(SW(140), ImGui.GetContentRegionAvail().X - trailing);
+                    ImGui.SetNextItemWidth(cmdW);
                     if (ImGui.InputTextWithHint("##cmd", "/handover, /say text, or written action", ref cmd, 400))
                     {
                         step.Command = cmd;
@@ -463,9 +467,7 @@ public partial class MainWindow
                 }
                 else
                 {
-                    ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + SW(360));
-                    ImGui.TextColored(Red, "ARE YOU SURE? ALL MACROS ON THIS MENU WILL BE GONE FOREVER.");
-                    ImGui.PopTextWrapPos();
+                    WrapText(Red, "ARE YOU SURE? ALL MACROS ON THIS MENU WILL BE GONE FOREVER.");
                     ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.6f, 0.1f, 0.1f, 1f));
                     if (ImGui.Button("Yes, delete them all"))
                     {
@@ -486,9 +488,7 @@ public partial class MainWindow
                 ImGui.EndPopup();
             }
         }
-        ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + SW(560));
-        ImGui.TextColored(Grey, "Standalone macro buttons that aren't tied to a menu item (no price, no sale) \u2014 for adverts, menu hand-overs, hourly call-outs, etc. They use the exact same step format as a menu item's serve sequence. (To make a macro fire when an item is served, build it into that item's serve sequence instead.) Each step is a command/emote with a wait after it; plain text becomes /emote, /commands send as-is.");
-        ImGui.PopTextWrapPos();
+        WrapText(Grey, "Standalone macro buttons that aren't tied to a menu item (no price, no sale) \u2014 for adverts, menu hand-overs, hourly call-outs, etc. They use the exact same step format as a menu item's serve sequence. (To make a macro fire when an item is served, build it into that item's serve sequence instead.) Each step is a command/emote with a wait after it; plain text becomes /emote, /commands send as-is.");
 
         MenuMacro? macroRemove = null;
         for (var mi = 0; mi < Menu.Macros.Count; mi++)
@@ -512,7 +512,9 @@ public partial class MainWindow
                     ImGui.TextColored(Grey, $"{s + 1}.");
                     ImGui.SameLine();
                     var cmd = step.Command;
-                    ImGui.SetNextItemWidth(SW(360));
+                    var mTrailing = SW(260);
+                    var mCmdW = Math.Max(SW(140), ImGui.GetContentRegionAvail().X - mTrailing);
+                    ImGui.SetNextItemWidth(mCmdW);
                     if (ImGui.InputTextWithHint("##cmd", "/micon \"x\" emote, /em ..., /t <t> ..., or written action", ref cmd, 400)) { step.Command = cmd; Menu.Save(); }
                     ImGui.SameLine();
                     ImGui.TextColored(Grey, "wait");

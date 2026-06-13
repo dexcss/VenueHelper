@@ -15,7 +15,7 @@ public partial class MainWindow
         currentTab = "DR Tourny Helper";
 
         ImGui.TextColored(Gold, "DR Tourny Helper");
-        ImGui.TextColored(Grey, "Open with /random (0-999), roll down each turn. Roll a 1 to lose, a 0 to win instantly.");
+        WrapText(Grey, "Open with /random (0-999), roll down each turn. Roll a 1 to lose, a 0 to win instantly.");
 
         ImGuiHelpers.ScaledDummy(6f);
 
@@ -43,7 +43,7 @@ public partial class MainWindow
             Dr.Kind = BracketKind.DoubleElimination;
         if (!single) ImGui.PopStyleColor();
         if (Dr.Kind == BracketKind.DoubleElimination)
-            ImGui.TextColored(Grey, "Losers get a second chance; a player is out after two losses.");
+            WrapText(Grey, "Losers get a second chance; a player is out after two losses.");
 
         ImGuiHelpers.ScaledDummy(6f);
 
@@ -55,7 +55,7 @@ public partial class MainWindow
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Both players /random this to decide who goes first; highest wins, ties re-roll.\n0 = plain /random (0-999).");
         ImGui.SameLine();
-        ImGui.TextColored(Grey, Dr.RolloffValue <= 0 ? "(players type /random)" : $"(players type /random {Dr.RolloffValue})");
+        WrapText(Grey, Dr.RolloffValue <= 0 ? "(players type /random)" : $"(players type /random {Dr.RolloffValue})");
 
         ImGuiHelpers.ScaledDummy(6f);
 
@@ -191,7 +191,7 @@ public partial class MainWindow
 
                 // Round header.
                 ImGui.TextColored(Gold, RoundName(r, rounds, matches));
-                ImGui.TextColored(Grey, $"{matches.Count(x => x.State == MatchState.Done)}/{matches.Count} done");
+                WrapText(Grey, $"{matches.Count(x => x.State == MatchState.Done)}/{matches.Count} done");
                 ImGuiHelpers.ScaledDummy(2f);
 
                 // Each round gets its own bordered column so the matches are
@@ -289,13 +289,13 @@ public partial class MainWindow
         if (m.BestOf > 1)
         {
             var needed = m.BestOf / 2 + 1;
-            ImGui.TextColored(Blue, $"Best of {m.BestOf} (first to {needed})  \u2014  Game {m.CurrentGame}:  {a.NameOnly} {m.WinsA} \u2013 {m.WinsB} {b.NameOnly}");
+            WrapText(Blue, $"Best of {m.BestOf} (first to {needed})  \u2014  Game {m.CurrentGame}:  {a.NameOnly} {m.WinsA} \u2013 {m.WinsB} {b.NameOnly}");
         }
 
         if (m.InRolloff)
         {
             var range = Dr.RolloffValue <= 0 ? "/random" : $"/random {Dr.RolloffValue}";
-            ImGui.TextColored(Blue, $"Roll-off \u2014 both players {range} (highest goes first, ties re-roll)");
+            WrapText(Blue, $"Roll-off \u2014 both players {range} (highest goes first, ties re-roll)");
             var aDone = m.RolloffValueA >= 0 ? m.RolloffValueA.ToString() : "waiting";
             var bDone = m.RolloffValueB >= 0 ? m.RolloffValueB.ToString() : "waiting";
             ImGui.TextColored(Grey, $"{a.NameOnly}: {aDone}    {b.NameOnly}: {bDone}");

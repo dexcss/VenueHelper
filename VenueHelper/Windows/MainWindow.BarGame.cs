@@ -45,9 +45,7 @@ public partial class MainWindow
     private void DrawBarGamePicker()
     {
         ImGui.TextColored(Gold, "Bar Game Helper");
-        ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + SW(560));
-        ImGui.TextColored(Grey, "Pick a game to run or edit, or make a new one. Build your own roll games with whatever pieces you need.");
-        ImGui.PopTextWrapPos();
+        WrapText(Grey, "Pick a game to run or edit, or make a new one. Build your own roll games with whatever pieces you need.");
 
         ImGuiHelpers.ScaledDummy(8f);
 
@@ -217,8 +215,8 @@ public partial class MainWindow
             if (ImGui.BeginPopup("##barvsraffle"))
             {
                 ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + SW(380));
-                ImGui.TextColored(Red, "A raffle is currently active and set to auto-credit trades.");
-                ImGui.TextColored(Grey, "If you start capturing here, incoming trades will count as bar-game buy-ins instead of raffle tickets. Run only one trade-based activity at a time.");
+                WrapText(Red, "A raffle is currently active and set to auto-credit trades.");
+                WrapText(Grey, "If you start capturing here, incoming trades will count as bar-game buy-ins instead of raffle tickets. Run only one trade-based activity at a time.");
                 ImGui.PopTextWrapPos();
                 ImGuiHelpers.ScaledDummy(4f);
                 if (ImGui.Button("Start anyway (trades go to this game)"))
@@ -242,9 +240,9 @@ public partial class MainWindow
         if (ImGui.Button("Clear rolls")) Bar.ClearPlays(g);
 
         if (g.EntryCost > 0)
-            ImGui.TextColored(Grey, $"Each {g.EntryCost:N0} gil traded = 1 roll. Players roll {BarGameService.RollCommand(g)}.");
+            WrapText(Grey, $"Each {g.EntryCost:N0} gil traded = 1 roll. Players roll {BarGameService.RollCommand(g)}.");
         else
-            ImGui.TextColored(Grey, $"Free game \u2014 any {BarGameService.RollCommand(g)} roll is captured.");
+            WrapText(Grey, $"Free game \u2014 any {BarGameService.RollCommand(g)} roll is captured.");
 
         // Add a buy-in manually: from target or typed name, paid (adds to pot)
         // or freebie (roll without adding to the pot).
@@ -313,7 +311,7 @@ public partial class MainWindow
         // Comparative winner highlight.
         BarGamePlay? compWinner = BarGameService.IsComparative(g) ? BarGameService.ComparativeWinner(g) : null;
         if (compWinner != null)
-            ImGui.TextColored(Gold, $"Current winner: {compWinner.NameOnly} with {compWinner.Roll}");
+            WrapText(Gold, $"Current winner: {compWinner.NameOnly} with {compWinner.Roll}");
 
         // Survival-streak per-player status.
         if (g.Condition == WinCondition.SurvivalStreak && g.Players.Count > 0)
@@ -328,7 +326,7 @@ public partial class MainWindow
                 ImGui.TextColored(Blue, "Leaderboard (longest streak wins):");
                 ImGui.SameLine();
                 if (leader != null)
-                    ImGui.TextColored(Gold, $"\u2605 {leader.NameOnly} leads with {leader.BestStreak} \u2014 pot {BarGameService.Payout(g):N0} gil");
+                    WrapText(Gold, $"\u2605 {leader.NameOnly} leads with {leader.BestStreak} \u2014 pot {BarGameService.Payout(g):N0} gil");
                 else
                     ImGui.TextColored(Grey, "no scores yet");
             }
@@ -371,7 +369,7 @@ public partial class MainWindow
                     if (pl.StreakWon)
                         ImGui.TextColored(Gold, $"  {pl.NameOnly}: WON! ({prog})");
                     else if (pl.StreakBusted)
-                        ImGui.TextColored(Red, $"  {pl.NameOnly}: out ({prog})" + (tiered && pl.TierWinnings > 0 ? $" \u2014 pay {pl.TierWinnings:N0} gil" : ""));
+                        WrapText(Red, $"  {pl.NameOnly}: out ({prog})" + (tiered && pl.TierWinnings > 0 ? $" \u2014 pay {pl.TierWinnings:N0} gil" : ""));
                     else
                         ImGui.TextColored(Green, $"  {pl.NameOnly}: {prog}");
                 }
@@ -385,7 +383,7 @@ public partial class MainWindow
                     {
                         if (pl.PendingCall != 0)
                         {
-                            ImGui.TextColored(Gold, $"\u2192 last {pl.LastRoll}, called {(pl.PendingCall > 0 ? "HIGHER" : "LOWER")} \u2014 they roll now");
+                            WrapText(Gold, $"\u2192 last {pl.LastRoll}, called {(pl.PendingCall > 0 ? "HIGHER" : "LOWER")} \u2014 they roll now");
                         }
                         else
                         {
@@ -441,10 +439,23 @@ public partial class MainWindow
                 foreach (var (name, rolls) in byPlayer)
                 {
                     ImGui.TextColored(new Vector4(0.95f, 0.9f, 0.75f, 1f), $"{name}:");
+                    var avail = ImGui.GetContentRegionAvail().X;
+                    var spacing = ImGui.GetStyle().ItemSpacing.X;
+                    var xUsed = ImGui.CalcTextSize($"{name}:").X;
                     foreach (var play in rolls)
                     {
                         var (_, col) = SurvivalRollResult(g, play.Roll);
-                        ImGui.SameLine(0, 8);
+                        var w = ImGui.CalcTextSize($"{play.Roll}").X;
+                        // Keep on the same line only if it fits; else wrap.
+                        if (xUsed + 8 + w <= avail)
+                        {
+                            ImGui.SameLine(0, 8);
+                            xUsed += 8 + w;
+                        }
+                        else
+                        {
+                            xUsed = w; // wrapped to a new line
+                        }
                         ImGui.TextColored(col, $"{play.Roll}");
                     }
                 }
@@ -474,7 +485,7 @@ public partial class MainWindow
                 ImGui.TextColored(isWinner ? Green : Grey, isWinner ? "WIN" : "-");
                 ImGui.TableNextColumn();
                 var pb = g.Players.TryGetValue(play.FullName, out var pl) ? pl : null;
-                ImGui.TextColored(Grey, g.EntryCost > 0 && pb != null ? pb.PlaysRemaining(g.EntryCost).ToString() : "-");
+                WrapText(Grey, g.EntryCost > 0 && pb != null ? pb.PlaysRemaining(g.EntryCost).ToString() : "-");
             }
             ImGui.EndTable();
         }
@@ -569,9 +580,9 @@ public partial class MainWindow
         switch (g.Condition)
         {
             case WinCondition.SpecificNumbers:
-                ImGui.TextColored(Grey, "Winning numbers \u2014 a roll wins if it matches any of these:");
+                WrapText(Grey, "Winning numbers \u2014 a roll wins if it matches any of these:");
                 if (g.WinningNumbers.Count == 0)
-                    ImGui.TextColored(Red, "No winning numbers set yet. Click \"+ Add winning number\" below.");
+                    WrapText(Red, "No winning numbers set yet. Click \"+ Add winning number\" below.");
 
                 int? removeAt = null;
                 for (var wn = 0; wn < g.WinningNumbers.Count; wn++)
@@ -619,9 +630,7 @@ public partial class MainWindow
                 if (ImGui.InputInt("Target", ref tgt, 1, 10)) { g.ClosestTarget = tgt; Config.Save(); }
                 break;
             case WinCondition.SurvivalStreak:
-                ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + SW(540));
-                ImGui.TextColored(Grey, "Players keep rolling on one buy-in until they miss. Pick how a roll \"succeeds\":");
-                ImGui.PopTextWrapPos();
+                WrapText(Grey, "Players keep rolling on one buy-in until they miss. Pick how a roll \"succeeds\":");
 
                 // Mode selector.
                 ImGui.SetNextItemWidth(SW(320));
@@ -636,7 +645,7 @@ public partial class MainWindow
                 switch (g.Survival)
                 {
                     case SurvivalMode.SameNumber:
-                        ImGui.TextColored(Grey, "Success number(s) \u2014 a roll continues the streak if it matches any:");
+                        WrapText(Grey, "Success number(s) \u2014 a roll continues the streak if it matches any:");
                         if (g.WinningNumbers.Count == 0)
                             ImGui.TextColored(Red, "No success numbers set. Click \"+ Add success number\".");
                         int? sRemove = null;
@@ -675,12 +684,10 @@ public partial class MainWindow
                         var thr = g.StaticThreshold;
                         ImGui.SetNextItemWidth(SW(120));
                         if (ImGui.InputInt("Threshold", ref thr, 1, 5)) { g.StaticThreshold = thr; Config.Save(); }
-                        ImGui.TextColored(Grey, $"Each roll must be {(g.StaticHigher ? "higher" : "lower")} than {g.StaticThreshold} to continue.");
+                        WrapText(Grey, $"Each roll must be {(g.StaticHigher ? "higher" : "lower")} than {g.StaticThreshold} to continue.");
                         break;
                     case SurvivalMode.DynamicHL:
-                        ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + SW(540));
-                        ImGui.TextColored(Grey, "Each player rolls a baseline, then you set their Higher/Lower call (in the play view) before each next roll. Beating the previous roll in the called direction continues the streak.");
-                        ImGui.PopTextWrapPos();
+                        WrapText(Grey, "Each player rolls a baseline, then you set their Higher/Lower call (in the play view) before each next roll. Beating the previous roll in the called direction continues the streak.");
                         break;
                 }
 
@@ -700,7 +707,7 @@ public partial class MainWindow
                     var need = g.StreakNeeded;
                     ImGui.SetNextItemWidth(SW(140));
                     if (ImGui.InputInt("In a row to win", ref need, 1, 1)) { g.StreakNeeded = Math.Max(1, need); Config.Save(); }
-                    ImGui.TextColored(Grey, "Reaching this streak wins the prize set in Pot & entry below.");
+                    WrapText(Grey, "Reaching this streak wins the prize set in Pot & entry below.");
                 }
                 else if (g.SurvivalPrizeKind == SurvivalPrize.Tiered)
                 {
@@ -710,15 +717,11 @@ public partial class MainWindow
                     var per = (int)g.TierPerStep;
                     ImGui.SetNextItemWidth(SW(160));
                     if (ImGui.InputInt("Gil per success after", ref per, 1000, 10000)) { g.TierPerStep = Math.Max(0, per); Config.Save(); }
-                    ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + SW(540));
-                    ImGui.TextColored(Grey, $"Each success past {g.TierThreshold} pays {g.TierPerStep:N0} gil. E.g. {g.TierThreshold + 3} in a row = {g.TierPerStep * 3:N0} gil. Players keep going until they miss; they keep what they've banked.");
-                    ImGui.PopTextWrapPos();
+                    WrapText(Grey, $"Each success past {g.TierThreshold} pays {g.TierPerStep:N0} gil. E.g. {g.TierThreshold + 3} in a row = {g.TierPerStep * 3:N0} gil. Players keep going until they miss; they keep what they've banked.");
                 }
                 else // HighScore
                 {
-                    ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + SW(540));
-                    ImGui.TextColored(Grey, "Everyone plays; each player's score is their longest streak. The player with the highest streak wins the pot (set in Pot & entry below) \u2014 you declare the winner when the round's done. The current leader is highlighted live in the play view.");
-                    ImGui.PopTextWrapPos();
+                    WrapText(Grey, "Everyone plays; each player's score is their longest streak. The player with the highest streak wins the pot (set in Pot & entry below) \u2014 you declare the winner when the round's done. The current leader is highlighted live in the play view.");
                 }
                 break;
         }
