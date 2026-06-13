@@ -308,7 +308,7 @@ public partial class MainWindow
                 ImGui.SetNextItemWidth(SW(150));
                 if (ImGui.InputInt("Price (gil)", ref price, 100, 1000)) { item.Price = Math.Max(0, price); Menu.Save(); }
 
-                ImGui.TextColored(Grey, "Serve sequence \u2014 like a macro: each step is a command/emote, with a wait (seconds) after it. Plain text becomes /emote; anything starting with / (e.g. /say, /micon, /handover, /trade) is sent as-is.");
+                ImGui.TextColored(Grey, "Serve sequence (this item's macro) \u2014 runs automatically when you press Serve. Each step is a command/emote with a wait (seconds) after it. Plain text becomes /emote; anything starting with / (e.g. /say, /micon, /handover, /trade) is sent as-is.");
                 int? stepRemove = null;
                 ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(4f, 2f));
                 ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(6f, 3f));
@@ -379,7 +379,7 @@ public partial class MainWindow
     // Play view: the macro buttons for the active profile.
     private void DrawMacroButtons()
     {
-        ImGui.TextColored(new Vector4(0.95f, 0.85f, 0.5f, 1f), "Macros");
+        ImGui.TextColored(new Vector4(0.95f, 0.85f, 0.5f, 1f), "Additional Macros");
         var macros = Menu.Macros;
         if (macros.Count == 0)
         {
@@ -388,13 +388,37 @@ public partial class MainWindow
             return;
         }
         var shown = 0;
+        var style = ImGui.GetStyle();
+        var avail = ImGui.GetContentRegionAvail().X;
+        var xUsed = 0f;
         for (var i = 0; i < macros.Count; i++)
         {
             var m = macros[i];
             if (string.IsNullOrWhiteSpace(m.Label)) continue;
             ImGui.PushID($"macrobtn{i}");
-            if (shown > 0) ImGui.SameLine();
+
+            // Estimate this button's width (label + frame padding) and wrap to a
+            // new line if placing it on the current line would overflow.
+            var btnW = ImGui.CalcTextSize(m.Label).X + style.FramePadding.X * 2;
+            if (shown > 0)
+            {
+                var projected = xUsed + style.ItemSpacing.X + btnW;
+                if (projected <= avail)
+                {
+                    ImGui.SameLine();
+                    xUsed = projected;
+                }
+                else
+                {
+                    xUsed = btnW; // new line
+                }
+            }
+            else
+            {
+                xUsed = btnW;
+            }
             shown++;
+
             if (ImGui.Button(m.Label))
             {
                 var (ok, msg) = Menu.RunMacro(m);
@@ -463,7 +487,7 @@ public partial class MainWindow
             }
         }
         ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + SW(560));
-        ImGui.TextColored(Grey, "Reusable macro buttons \u2014 like a menu item's serve sequence but with no price. Use for adverts, menu hand-overs, etc. Each step is a command/emote with a wait after it (plain text becomes /emote; /commands send as-is).");
+        ImGui.TextColored(Grey, "Standalone macro buttons that aren't tied to a menu item (no price, no sale) \u2014 for adverts, menu hand-overs, hourly call-outs, etc. They use the exact same step format as a menu item's serve sequence. (To make a macro fire when an item is served, build it into that item's serve sequence instead.) Each step is a command/emote with a wait after it; plain text becomes /emote, /commands send as-is.");
         ImGui.PopTextWrapPos();
 
         MenuMacro? macroRemove = null;
