@@ -30,6 +30,81 @@ public partial class MainWindow
 
         ImGuiHelpers.ScaledDummy(6f);
 
+        // ---- Optional pot + contributors ------------------------------
+        var showPot = Config.GiveawayShowPot;
+        if (ImGui.Checkbox("Show pot and additional contributors", ref showPot))
+        {
+            Config.GiveawayShowPot = showPot;
+            Config.Save();
+        }
+        if (showPot)
+        {
+            ImGui.TextColored(Blue, "Pot");
+            var house = Config.GiveawayHousePot;
+            var houseText = house == 0 ? string.Empty : house.ToString();
+            ImGui.SetNextItemWidth(SW(160));
+            if (ImGui.InputTextWithHint("##housepot", "House pot (e.g. 3.4M)", ref houseText, 24))
+            {
+                if (GilFormat.TryParse(houseText, out var parsed)) { Config.GiveawayHousePot = Math.Max(0, parsed); Config.Save(); }
+                else if (string.IsNullOrWhiteSpace(houseText)) { Config.GiveawayHousePot = 0; Config.Save(); }
+            }
+            ImGui.SameLine();
+            ImGui.TextColored(Gold, $"Total pot: {GilFormat.Short(Give.TotalPot)} ({Give.TotalPot:N0} gil)");
+
+            // Contributors list.
+            GiveawayContribution? removeContrib = null;
+            foreach (var c in Config.GiveawayContributions)
+            {
+                ImGui.PushID(c.Id.ToString());
+                ImGui.TextColored(Green, "\u2022");
+                ImGui.SameLine();
+                ImGui.TextUnformatted($"{c.Name} \u2014 {GilFormat.Short(c.Amount)} ({c.Amount:N0} gil)");
+                ImGui.SameLine();
+                if (ImGui.SmallButton("x")) removeContrib = c;
+                if (ImGui.IsItemHovered()) ImGui.SetTooltip("Remove this contributor.");
+                ImGui.PopID();
+            }
+            if (removeContrib != null)
+            {
+                Config.GiveawayContributions.Remove(removeContrib);
+                Config.Save();
+            }
+
+            // Add a contributor.
+            if (ImGui.Button("Target##contrib"))
+            {
+                var t = Plugin.GetTargetName();
+                if (string.IsNullOrEmpty(t)) SetStatus("No player targeted.", Red);
+                else giveawayContribName = t.Replace('\uE05D', '@');
+            }
+            ImGui.SameLine();
+            ImGui.SetNextItemWidth(SW(170));
+            ImGui.InputTextWithHint("##contribname", "Contributor name", ref giveawayContribName, 64);
+            ImGui.SameLine();
+            ImGui.SetNextItemWidth(SW(120));
+            ImGui.InputTextWithHint("##contribamt", "amount (5M)", ref giveawayContribAmount, 24);
+            ImGui.SameLine();
+            if (ImGui.Button("+ Add##contrib"))
+            {
+                if (string.IsNullOrWhiteSpace(giveawayContribName))
+                    SetStatus("Enter a contributor name first.", Red);
+                else if (!GilFormat.TryParse(giveawayContribAmount, out var amt) || amt <= 0)
+                    SetStatus("Enter a valid amount (e.g. 5M).", Red);
+                else
+                {
+                    Config.GiveawayContributions.Add(new GiveawayContribution { Name = giveawayContribName, Amount = amt });
+                    Config.Save();
+                    SetStatus($"Added {giveawayContribName} \u2014 {GilFormat.Short(amt)} to the pot.", Green);
+                    giveawayContribName = string.Empty;
+                    giveawayContribAmount = string.Empty;
+                }
+            }
+            ImGuiHelpers.ScaledDummy(4f);
+            ImGui.Separator();
+        }
+
+        ImGuiHelpers.ScaledDummy(6f);
+
         // ---- Mode selection -------------------------------------------
         ImGui.TextColored(Blue, "Winner mode");
 
@@ -407,77 +482,6 @@ public partial class MainWindow
         ImGuiHelpers.ScaledDummy(6f);
         ImGui.Separator();
         ImGuiHelpers.ScaledDummy(6f);
-
-        // ---- Optional pot + contributors ------------------------------
-        var showPot = Config.GiveawayShowPot;
-        if (ImGui.Checkbox("Show pot and additional contributors", ref showPot))
-        {
-            Config.GiveawayShowPot = showPot;
-            Config.Save();
-        }
-        if (showPot)
-        {
-            ImGui.TextColored(Blue, "Pot");
-            var house = Config.GiveawayHousePot;
-            var houseText = house == 0 ? string.Empty : house.ToString();
-            ImGui.SetNextItemWidth(SW(160));
-            if (ImGui.InputTextWithHint("##housepot", "House pot (e.g. 3.4M)", ref houseText, 24))
-            {
-                if (GilFormat.TryParse(houseText, out var parsed)) { Config.GiveawayHousePot = Math.Max(0, parsed); Config.Save(); }
-                else if (string.IsNullOrWhiteSpace(houseText)) { Config.GiveawayHousePot = 0; Config.Save(); }
-            }
-            ImGui.SameLine();
-            ImGui.TextColored(Gold, $"Total pot: {GilFormat.Short(Give.TotalPot)} ({Give.TotalPot:N0} gil)");
-
-            // Contributors list.
-            GiveawayContribution? removeContrib = null;
-            foreach (var c in Config.GiveawayContributions)
-            {
-                ImGui.PushID(c.Id.ToString());
-                ImGui.TextColored(Green, "\u2022");
-                ImGui.SameLine();
-                ImGui.TextUnformatted($"{c.Name} \u2014 {GilFormat.Short(c.Amount)} ({c.Amount:N0} gil)");
-                ImGui.SameLine();
-                if (ImGui.SmallButton("x")) removeContrib = c;
-                if (ImGui.IsItemHovered()) ImGui.SetTooltip("Remove this contributor.");
-                ImGui.PopID();
-            }
-            if (removeContrib != null)
-            {
-                Config.GiveawayContributions.Remove(removeContrib);
-                Config.Save();
-            }
-
-            // Add a contributor.
-            if (ImGui.Button("Target##contrib"))
-            {
-                var t = Plugin.GetTargetName();
-                if (string.IsNullOrEmpty(t)) SetStatus("No player targeted.", Red);
-                else giveawayContribName = t.Replace('\uE05D', '@');
-            }
-            ImGui.SameLine();
-            ImGui.SetNextItemWidth(SW(170));
-            ImGui.InputTextWithHint("##contribname", "Contributor name", ref giveawayContribName, 64);
-            ImGui.SameLine();
-            ImGui.SetNextItemWidth(SW(120));
-            ImGui.InputTextWithHint("##contribamt", "amount (5M)", ref giveawayContribAmount, 24);
-            ImGui.SameLine();
-            if (ImGui.Button("+ Add##contrib"))
-            {
-                if (string.IsNullOrWhiteSpace(giveawayContribName))
-                    SetStatus("Enter a contributor name first.", Red);
-                else if (!GilFormat.TryParse(giveawayContribAmount, out var amt) || amt <= 0)
-                    SetStatus("Enter a valid amount (e.g. 5M).", Red);
-                else
-                {
-                    Config.GiveawayContributions.Add(new GiveawayContribution { Name = giveawayContribName, Amount = amt });
-                    Config.Save();
-                    SetStatus($"Added {giveawayContribName} \u2014 {GilFormat.Short(amt)} to the pot.", Green);
-                    giveawayContribName = string.Empty;
-                    giveawayContribAmount = string.Empty;
-                }
-            }
-        }
 
         // ---- Winner log -----------------------------------------------
         if (Give.LoggedWinners.Count > 0)
