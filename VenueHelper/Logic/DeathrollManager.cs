@@ -426,7 +426,7 @@ public class DeathrollManager
 
     // Called by the hook for every /random while a match is active. Returns true
     // if the roll belonged to (was consumed by) the active match.
-    public bool OnRoll(string fullName, int roll, int outOf)
+    public bool OnRoll(string fullName, int roll, int outOf, bool isDice = false)
     {
         var m = ActiveMatch;
         if (m is not { State: MatchState.InProgress }) return false;
@@ -437,6 +437,14 @@ public class DeathrollManager
 
         var roller = MatchPlayer(fullName, a, b);
         if (roller == null) return false; // not one of the two competitors
+
+        // Deathroll is strictly a /random game; /dice is never valid.
+        if (isDice)
+        {
+            Log(m, roller, roll, outOf, "used /dice \u2014 deathroll uses /random only");
+            Config.Save();
+            return true;
+        }
 
         var normalizedOut = outOf <= 0 ? PlainRandomOutOf : outOf;
 

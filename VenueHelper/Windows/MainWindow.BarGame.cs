@@ -242,7 +242,7 @@ public partial class MainWindow
         if (g.EntryCost > 0)
             WrapText(Grey, $"Each {g.EntryCost:N0} gil traded = 1 roll. Players roll {BarGameService.RollCommand(g)}.");
         else
-            WrapText(Grey, $"Free game \u2014 any {BarGameService.RollCommand(g)} roll is captured.");
+            WrapText(Grey, $"Free game \u2014 one {BarGameService.RollCommand(g)} roll per player. Use \"Add freebie\" to grant someone an extra roll.");
 
         // Add a buy-in manually: from target or typed name, paid (adds to pot)
         // or freebie (roll without adding to the pot).
@@ -282,7 +282,9 @@ public partial class MainWindow
             else SetStatus("Enter or target a name first.", Red);
         }
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Grants one free play \u2014 they get a roll but it does NOT add to the pot.");
+            ImGui.SetTooltip(g.EntryCost > 0
+                ? "Grants one free play \u2014 they get a roll but it does NOT add to the pot."
+                : "Grants one extra roll to this player (free games are one roll each by default).");
 
         // Manual roll entry: enter a roll for someone who rolled early / before
         // capture. Reuses the same name box; routes through the normal scoring.

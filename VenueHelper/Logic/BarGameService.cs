@@ -172,6 +172,8 @@ public class BarGameService
         p.PendingCall = 0;
         p.TierWinnings = 0;
         p.BestStreak = 0;
+        p.FreeRollsUsed = 0;
+        p.FreeRollsGranted = 0;
         Config.Save();
     }
 
@@ -198,6 +200,9 @@ public class BarGameService
             p.StreakWon = false;
             p.LastRoll = -1;
             p.PendingCall = 0;
+            // Fresh round: everyone gets their free roll/run back.
+            p.FreeRollsUsed = 0;
+            p.FreeRollsGranted = 0;
         }
         Config.Save();
     }
@@ -258,8 +263,16 @@ public class BarGameService
     public void AddManualPlay(BarGame g, string fullName)
     {
         var p = ResolvePlayer(g, fullName);
-        p.GilPaid += Math.Max(1, g.EntryCost);
-        GrowPot(g, 1);
+        if (g.EntryCost > 0)
+        {
+            p.GilPaid += g.EntryCost;
+            GrowPot(g, 1);
+        }
+        else
+        {
+            // Free game: grant one extra roll beyond the default single roll.
+            p.FreeRollsGranted += 1;
+        }
         RestartFinishedRun(g, p);
         Config.Save();
     }
@@ -268,9 +281,17 @@ public class BarGameService
     public void AddFreebie(BarGame g, string fullName)
     {
         var p = ResolvePlayer(g, fullName);
-        // Grant a play's worth of "paid" allowance so a roll is accepted, but
-        // don't grow the pot.
-        p.GilPaid += Math.Max(1, g.EntryCost);
+        if (g.EntryCost > 0)
+        {
+            // Paid game: grant a play's worth of allowance so a roll is accepted,
+            // but don't grow the pot.
+            p.GilPaid += g.EntryCost;
+        }
+        else
+        {
+            // Free game: grant one extra roll beyond the default single roll.
+            p.FreeRollsGranted += 1;
+        }
         RestartFinishedRun(g, p);
         Config.Save();
     }
@@ -285,26 +306,54 @@ public class BarGameService
     }
 
     // Hook calls this on every /random or /dice while a game is tracking.
-    public void OnRoll(string fullName, int result, int outOf)
+    private static string NameOnly(string fullName)
+    {
+        var idx = fullName.IndexOf('\uE05D');
+        return idx < 0 ? fullName : fullName[..idx];
+    }
+
+    public void OnRoll(string fullName, int result, int outOf, bool isDice = false)
     {
         var g = ActiveTrackingGame;
         if (g == null) return;
-        ProcessRoll(g, fullName, result, outOf);
+        ProcessRoll(g, fullName, result, outOf, isDice);
     }
 
     // Manually enter a roll for a player (e.g. they rolled before capture
     // started). Routes through the same scoring as a captured roll, so survival
     // streaks, win detection, and play-gating all behave identically. Uses the
-    // game's own ceiling for the roll's "out of".
+    // game's own ceiling for the roll's "out of". Manual entries are trusted
+    // (host-entered), so they bypass the /dice-vs-/random source check.
     public void ManualRoll(BarGame g, string fullName, int result)
     {
         if (g == null) return;
         var outOf = g.Roll == RollKind.RandomPlain ? 1000 : g.RollCeiling;
-        ProcessRoll(g, fullName, result, outOf);
+        ProcessRoll(g, fullName, result, outOf, isDice: g.Roll == RollKind.Dice, manual: true);
     }
 
-    private void ProcessRoll(BarGame g, string fullName, int result, int outOf)
+    private void ProcessRoll(BarGame g, string fullName, int result, int outOf, bool isDice = false, bool manual = false)
     {
+        // Anti-cheat: the roll must come from the command the game uses. A live
+        // /dice only counts in a Dice game; a live /random only counts in a
+        // /random game. (Manual host entries skip this source check.)
+        if (!manual)
+        {
+            var gameUsesDice = g.Roll == RollKind.Dice;
+            if (isDice != gameUsesDice)
+            {
+                Plugin.Log.Information($"Bar game: ignored {(isDice ? "/dice" : "/random")} from {NameOnly(fullName)} \u2014 this game uses {(gameUsesDice ? "/dice" : "/random")}.");
+                return;
+            }
+
+            // For a plain /random game, reject /random N (a shrunk range used to
+            // fish for a result). The ceiling check below covers /random N games.
+            if (g.Roll == RollKind.RandomPlain && outOf > 0 && outOf != 999 && outOf != 1000)
+            {
+                Plugin.Log.Information($"Bar game: ignored /random {outOf} from {NameOnly(fullName)} \u2014 this game needs a plain /random.");
+                return;
+            }
+        }
+
         var normalized = outOf <= 0 ? (g.Roll == RollKind.RandomPlain ? 1000 : g.RollCeiling) : outOf;
 
         // If the game expects a specific ceiling, ignore mismatched rolls.
@@ -325,15 +374,31 @@ public class BarGameService
             // baseline roll for dynamic mode). Only require a fresh paid play to
             // START a run, not for every roll within it.
             var runInProgress = sp.Streak > 0 || sp.LastRoll >= 0;
-            if (!runInProgress && g.EntryCost > 0)
+            if (!runInProgress)
             {
-                if (sp.PlaysRemaining(g.EntryCost) <= 0)
+                if (g.EntryCost > 0)
                 {
-                    Plugin.Log.Information($"Bar game: ignored roll from {sp.NameOnly} (no paid play to start a run).");
-                    return;
+                    if (sp.PlaysRemaining(g.EntryCost) <= 0)
+                    {
+                        Plugin.Log.Information($"Bar game: ignored roll from {sp.NameOnly} (no paid play to start a run).");
+                        return;
+                    }
+                    // Consume one play to start this run.
+                    sp.PlaysUsed += 1;
                 }
-                // Consume one play to start this run.
-                sp.PlaysUsed += 1;
+                else
+                {
+                    // Free game: one run per player by default, so nobody can
+                    // restart endlessly to fish for a long streak. Host grants
+                    // extra runs via freebie/manual buttons (FreeRollsGranted).
+                    var allowedRuns = 1 + sp.FreeRollsGranted;
+                    if (sp.FreeRollsUsed >= allowedRuns)
+                    {
+                        Plugin.Log.Information($"Bar game: ignored run from {sp.NameOnly} (free game \u2014 one run each unless the host grants more).");
+                        return;
+                    }
+                    sp.FreeRollsUsed += 1;
+                }
             }
 
             // Decide success based on the survival mode.
@@ -389,19 +454,30 @@ public class BarGameService
             return;
         }
 
+        var player = ResolvePlayer(g, fullName);
         if (g.EntryCost > 0)
         {
-            var p = ResolvePlayer(g, fullName);
-            if (p.PlaysRemaining(g.EntryCost) <= 0)
+            // Paid game: each roll consumes a paid play.
+            if (player.PlaysRemaining(g.EntryCost) <= 0)
             {
-                Plugin.Log.Information($"Bar game: ignored roll from {p.NameOnly} (no paid play).");
+                Plugin.Log.Information($"Bar game: ignored roll from {player.NameOnly} (no paid play).");
                 return;
             }
-            p.PlaysUsed += 1;
+            player.PlaysUsed += 1;
         }
         else
         {
-            ResolvePlayer(g, fullName);
+            // Free game: one roll per player by default, so nobody can roll
+            // repeatedly to fish for a better result. The host can grant extra
+            // rolls with "Add freebie" / the manual play button (each adds one
+            // to FreeRollsGranted).
+            var allowed = 1 + player.FreeRollsGranted;
+            if (player.FreeRollsUsed >= allowed)
+            {
+                Plugin.Log.Information($"Bar game: ignored extra roll from {player.NameOnly} (free game \u2014 one roll each unless the host grants more).");
+                return;
+            }
+            player.FreeRollsUsed += 1;
         }
 
         var won = IsWinningRoll(g, result);

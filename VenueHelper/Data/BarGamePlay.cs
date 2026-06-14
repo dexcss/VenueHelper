@@ -47,6 +47,10 @@ public class BarGamePlayer
     public int PendingCall;          // host's call for the next dynamic roll: +1 higher, -1 lower, 0 none
     public long TierWinnings;        // gil earned so far in a tiered survival run
     public int BestStreak;           // best streak achieved (for high-score mode)
+    // Free-game roll accounting: one roll per player by default; the host can
+    // grant extra rolls (FreeRollsGranted) via the freebie/manual buttons.
+    public int FreeRollsUsed;
+    public int FreeRollsGranted;
 
     public BarGamePlayer() { }
     public BarGamePlayer(string fullName) => FullName = fullName;
