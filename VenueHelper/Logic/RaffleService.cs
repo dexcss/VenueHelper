@@ -106,8 +106,54 @@ public class RaffleService
 
     public void Reset()
     {
+        ArchiveCurrent();
         Config.RaffleEntries.Clear();
+        Config.RaffleWinner = string.Empty;
         Config.Save();
+    }
+
+    // ---- Winner + history ----------------------------------------------
+
+    public string Winner
+    {
+        get => Config.RaffleWinner;
+        set { Config.RaffleWinner = value ?? string.Empty; Config.Save(); }
+    }
+
+    public long Pot => (long)TotalPaidTickets * Config.TicketCost;
+    public long HouseTake => (long)Math.Round(Pot * (HouseCutPercent / 100.0));
+    public long WinnerPayout => Pot - HouseTake;
+
+    public IReadOnlyList<Data.GameHistoryEntry> History => Config.RaffleHistory;
+
+    // Snapshot the current raffle into history if there's anything to keep.
+    public bool ArchiveCurrent()
+    {
+        if (Config.RaffleEntries.Count == 0 && string.IsNullOrWhiteSpace(Config.RaffleWinner))
+            return false;
+        var winnerName = string.IsNullOrWhiteSpace(Config.RaffleWinner) ? "(undrawn)" : NameOnly(Config.RaffleWinner);
+        Config.RaffleHistory.Insert(0, new Data.GameHistoryEntry
+        {
+            When = DateTime.Now,
+            Kind = "Raffle",
+            Winner = winnerName,
+            Pot = Pot,
+            Details = $"{TotalTickets} tickets, {Config.RaffleEntries.Count} players, payout {GilFormat.Short(WinnerPayout)} (house {HouseCutPercent:0}%)",
+        });
+        Config.Save();
+        return true;
+    }
+
+    public void ClearHistory()
+    {
+        Config.RaffleHistory.Clear();
+        Config.Save();
+    }
+
+    private static string NameOnly(string full)
+    {
+        var idx = full.IndexOf('\uE05D');
+        return idx < 0 ? full : full[..idx];
     }
 
     // ---- Ticket number assignment --------------------------------------

@@ -40,6 +40,7 @@ public class Configuration : IPluginConfiguration
     public long TicketCost = 100000;
     // When a trade is detected, auto-credit it to the raffle as tickets.
     public bool RaffleAutoTrade = true;
+    public string RaffleWinner = string.Empty; // current raffle winner (NameOnly or full)
     // House cut percent for raffles (e.g. 20 for an 80/20 split). Whole numbers.
     public float RaffleHouseCutPercent = 0f;
 
@@ -96,6 +97,22 @@ public class Configuration : IPluginConfiguration
     public int GiveawayMatchTarget = 777;
     // Set to the winning roll's Id when an exact-match race is won.
     public string GiveawayMatchWinnerId = string.Empty;
+
+    // Announce line (like Shout/Yell): one message + channel for the giveaway.
+    public string GiveawayAnnounceText = string.Empty;
+    public int GiveawayAnnounceChannel = 1;                // ChatChannel (default Yell)
+    // Logged winners (name + when + optional note).
+    public List<GiveawayWinner> GiveawayWinners = new();
+    // Optional pot tracking.
+    public bool GiveawayShowPot = false;
+    public long GiveawayHousePot = 0;
+    public List<GiveawayContribution> GiveawayContributions = new();
+    // Archived past giveaways (winners + pot + contributors), kept across resets.
+    public List<GiveawayHistoryEntry> GiveawayHistory = new();
+    // Shared game histories (archived on reset).
+    public List<GameHistoryEntry> RaffleHistory = new();
+    public List<GameHistoryEntry> DeathrollHistory = new();
+    public List<GameHistoryEntry> BarGameHistory = new();
 
     // ---- Deathroll Helper ----------------------------------------------
     public List<DeathrollPlayer> DeathrollPlayers = new();

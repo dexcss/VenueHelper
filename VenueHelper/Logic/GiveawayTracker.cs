@@ -55,6 +55,7 @@ public class GiveawayTracker
     }
 
     public bool ExactMatchOn => Modes.HasFlag(GiveawayMode.ExactMatch);
+    public bool ManualOn => Modes.HasFlag(GiveawayMode.Manual);
 
     // The winning roll of an exact-match race, if one has been hit.
     public GiveawayRoll? MatchWinner =>
@@ -79,13 +80,66 @@ public class GiveawayTracker
         Config.Save();
     }
 
+    public IReadOnlyList<GiveawayHistoryEntry> History => Config.GiveawayHistory;
+
+    // Snapshot the current giveaway (winners + pot + contributors) into history,
+    // if there's anything worth keeping. Returns true if an entry was archived.
+    public bool ArchiveCurrent()
+    {
+        var hasContent = Config.GiveawayWinners.Count > 0
+                         || Config.GiveawayContributions.Count > 0
+                         || Config.GiveawayHousePot > 0;
+        if (!hasContent) return false;
+
+        Config.GiveawayHistory.Insert(0, new GiveawayHistoryEntry
+        {
+            When = DateTime.Now,
+            Mode = ModeLabel,
+            HousePot = Config.GiveawayHousePot,
+            TotalPot = TotalPot,
+            Winners = Config.GiveawayWinners.Select(w => new GiveawayWinner
+                { Id = w.Id, FullName = w.FullName, Note = w.Note, When = w.When }).ToList(),
+            Contributions = Config.GiveawayContributions.Select(c => new GiveawayContribution
+                { Id = c.Id, Name = c.Name, Amount = c.Amount }).ToList(),
+        });
+        Config.Save();
+        return true;
+    }
+
+    public void ClearHistory()
+    {
+        Config.GiveawayHistory.Clear();
+        Config.Save();
+    }
+
+    // A short label for the current mode (used in history records).
+    public string ModeLabel
+    {
+        get
+        {
+            if (ManualOn) return "Manual";
+            if (ExactMatchOn) return "Race";
+            var parts = new List<string>();
+            if (Modes.HasFlag(GiveawayMode.Highest)) parts.Add("Highest");
+            if (Modes.HasFlag(GiveawayMode.Lowest)) parts.Add("Lowest");
+            if (Modes.HasFlag(GiveawayMode.Closest)) parts.Add("Closest");
+            return parts.Count == 0 ? "(none)" : string.Join("+", parts);
+        }
+    }
+
     public void Reset()
     {
+        // Archive the finished giveaway first, so its winners/pot are kept.
+        ArchiveCurrent();
         counted.Clear();
         Config.GiveawayOrdered.Clear();
         Config.GiveawayFeed.Clear();
         Config.GiveawayMatchWinnerId = string.Empty;
         Config.GiveawayRunning = false;
+        // Clear the pot/contributors/winner log for a clean next giveaway.
+        Config.GiveawayHousePot = 0;
+        Config.GiveawayContributions.Clear();
+        Config.GiveawayWinners.Clear();
         Config.Save();
     }
 
@@ -111,6 +165,11 @@ public class GiveawayTracker
     public void OnRoll(string fullName, int roll, int outOf, bool isDice = false)
     {
         if (!Config.GiveawayRunning)
+            return;
+
+        // Manual mode: the giveaway runs elsewhere (e.g. Twitch). Don't capture
+        // any in-game rolls; the host tracks the pot/winner by hand.
+        if (ManualOn)
             return;
 
         // /dice only counts if the host enabled it; default is /random only.
@@ -166,6 +225,33 @@ public class GiveawayTracker
     }
 
     // ---- Winners -------------------------------------------------------
+
+    public IReadOnlyList<GiveawayWinner> LoggedWinners => Config.GiveawayWinners;
+
+    // Log a player as a giveaway winner (with an optional note describing why).
+    public void CreditWinner(string fullName, string note)
+    {
+        if (string.IsNullOrWhiteSpace(fullName)) return;
+        Config.GiveawayWinners.Insert(0, new GiveawayWinner
+        {
+            FullName = fullName,
+            Note = note ?? string.Empty,
+        });
+        Config.Save();
+    }
+
+    public bool IsLoggedWinner(string fullName) =>
+        Config.GiveawayWinners.Any(w => w.FullName == fullName);
+
+    public void RemoveWinner(GiveawayWinner w)
+    {
+        Config.GiveawayWinners.Remove(w);
+        Config.Save();
+    }
+
+    // Total pot = house contribution + all donor contributions.
+    public long TotalPot =>
+        Config.GiveawayHousePot + Config.GiveawayContributions.Sum(c => c.Amount);
 
     public GiveawayRoll? Highest => Count == 0 ? null : Config.GiveawayOrdered.MaxBy(e => e.Roll);
     public GiveawayRoll? Lowest => Count == 0 ? null : Config.GiveawayOrdered.MinBy(e => e.Roll);

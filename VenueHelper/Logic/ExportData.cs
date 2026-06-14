@@ -171,4 +171,55 @@ public static class ExportData
         return new TableData("Giveaway Rolls",
             new[] { "Name", "World", "Roll", "OutOf", "Time" }, rows);
     }
+
+    public static TableData GiveawayWinners(IReadOnlyList<Data.GiveawayWinner> winners)
+    {
+        var rows = winners.Select(w => (IReadOnlyList<string>)new List<string>
+        {
+            w.NameOnly,
+            w.Note,
+            w.When.ToString("yyyy-MM-dd HH:mm"),
+        }).ToList();
+        return new TableData("Giveaway Winners",
+            new[] { "Winner", "Note", "When" }, rows);
+    }
+
+    public static TableData GiveawayContributions(IReadOnlyList<Data.GiveawayContribution> contribs, long housePot, long totalPot)
+    {
+        var rows = new List<IReadOnlyList<string>>
+        {
+            new List<string> { "House", housePot.ToString("N0") },
+        };
+        rows.AddRange(contribs.Select(c => (IReadOnlyList<string>)new List<string> { c.Name, c.Amount.ToString("N0") }));
+        rows.Add(new List<string> { "TOTAL", totalPot.ToString("N0") });
+        return new TableData("Giveaway Pot", new[] { "Contributor", "Gil" }, rows);
+    }
+
+    public static TableData GiveawayHistoryExport(IReadOnlyList<Data.GiveawayHistoryEntry> history)
+    {
+        var rows = history.Select(h => (IReadOnlyList<string>)new List<string>
+        {
+            h.When.ToString("yyyy-MM-dd HH:mm"),
+            h.Mode,
+            h.WinnerSummary,
+            h.TotalPot.ToString("N0"),
+            h.ContributorSummary,
+        }).ToList();
+        return new TableData("Giveaway History",
+            new[] { "When", "Mode", "Winner(s)", "Total Pot", "Contributors" }, rows);
+    }
+
+    public static TableData GameHistory(string title, IReadOnlyList<Data.GameHistoryEntry> history)
+    {
+        var rows = history.Select(h => (IReadOnlyList<string>)new List<string>
+        {
+            h.When.ToString("yyyy-MM-dd HH:mm"),
+            h.Kind,
+            h.Winner,
+            h.Pot.ToString("N0"),
+            h.Details,
+        }).ToList();
+        return new TableData(title,
+            new[] { "When", "Type", "Winner", "Pot", "Details" }, rows);
+    }
 }

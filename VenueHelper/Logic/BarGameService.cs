@@ -156,8 +156,55 @@ public class BarGameService
 
     public void ClearPlays(BarGame g)
     {
+        ArchiveCurrent(g);
         g.Players.Clear();
         g.Plays.Clear();
+        Config.Save();
+    }
+
+    public IReadOnlyList<Data.GameHistoryEntry> BarHistory => Config.BarGameHistory;
+
+    // Archive a finished bar-game round (winner + pot) to history.
+    public bool ArchiveCurrent(BarGame g)
+    {
+        if (g.Plays.Count == 0 && g.Players.Count == 0) return false;
+
+        // Determine the winner by the game's condition.
+        string winner;
+        if (g.Condition == WinCondition.SurvivalStreak)
+        {
+            if (g.SurvivalPrizeKind == SurvivalPrize.HighScore)
+            {
+                var lead = HighScoreLeader(g);
+                winner = lead != null ? $"{lead.NameOnly} (streak {lead.BestStreak})" : "(none)";
+            }
+            else
+            {
+                var won = g.Players.Values.FirstOrDefault(p => p.StreakWon);
+                winner = won != null ? won.NameOnly : "(none)";
+            }
+        }
+        else
+        {
+            var cw = ComparativeWinner(g);
+            winner = cw != null ? $"{cw.NameOnly} (rolled {cw.Roll})" : "(none)";
+        }
+
+        Config.BarGameHistory.Insert(0, new Data.GameHistoryEntry
+        {
+            When = DateTime.Now,
+            Kind = g.Name,
+            Winner = winner,
+            Pot = Payout(g),
+            Details = $"{g.Players.Count} players, {g.Plays.Count} rolls",
+        });
+        Config.Save();
+        return true;
+    }
+
+    public void ClearBarHistory()
+    {
+        Config.BarGameHistory.Clear();
         Config.Save();
     }
 

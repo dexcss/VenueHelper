@@ -41,4 +41,5 @@ public enum GiveawayMode
     Lowest = 2,
     Closest = 4,
     ExactMatch = 8, // "roll until someone hits the target number" race mode
+    Manual = 16,    // giveaway run elsewhere (e.g. Twitch); no roll capture, just tracking
 }

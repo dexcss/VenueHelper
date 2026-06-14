@@ -9,6 +9,16 @@ namespace VenueHelper.Windows;
 public partial class MainWindow
 {
     private string raffleManualName = string.Empty;
+    private string raffleWinnerInput = string.Empty;
+    private bool showRaffleHistory = false;
+
+    private string RaffleWinnerName()
+    {
+        var w = Raffle.Winner ?? string.Empty;
+        var idx = w.IndexOf('\uE05D');
+        return idx < 0 ? w : w[..idx];
+    }
+
     private int raffleManualTickets = 1;
     private float raffleHouseCutInput = -1f;
     private string raffleSearch = string.Empty;
@@ -25,7 +35,9 @@ public partial class MainWindow
             new ExportItem("Ticket list (name per ticket, for wheelofnames.com)", "raffle_list",
                 () => ExportData.RaffleList(Raffle.Entries)),
             new ExportItem("Summary (1 row per player, includes notes)", "raffle_summary",
-                () => ExportData.RaffleSummary(Raffle.Entries)));
+                () => ExportData.RaffleSummary(Raffle.Entries)),
+            new ExportItem("History (past raffles)", "raffle_history",
+                () => ExportData.GameHistory("Raffle History", Raffle.History)));
         WrapText(Grey, "Enter how many tickets each player bought, then assign 0-999 for the draw.");
 
         // Warn if a bar game is currently capturing trades \u2014 they'd be taken as
@@ -180,11 +192,11 @@ public partial class MainWindow
         ImGui.PopStyleColor();
         if (ImGui.BeginPopup("##resetraffle"))
         {
-            ImGui.TextColored(Red, "Are you sure? Clear all raffle entries?");
+            WrapText(Red, "Reset for a new raffle? The current entries and winner are saved to History first, then cleared.");
             if (ImGui.Button("Yes, reset"))
             {
                 Raffle.Reset();
-                SetStatus("Raffle cleared.", Red);
+                SetStatus("Raffle archived to history and cleared.", Green);
                 ImGui.CloseCurrentPopup();
             }
             ImGui.SameLine();
@@ -199,6 +211,44 @@ public partial class MainWindow
             var cut = (long)(pot * Raffle.HouseCutPercent / 100f);
             WrapText(Grey, $"Estimated pot: {pot:N0} gil   |   House ({Raffle.HouseCutPercent:0}%): {cut:N0}   |   Winner: {pot - cut:N0}");
         }
+
+        // ---- Winner + history -----------------------------------------
+        ImGui.TextColored(Blue, "Winner");
+        ImGui.SameLine();
+        if (!string.IsNullOrWhiteSpace(Raffle.Winner))
+        {
+            ImGui.TextColored(Gold, $"\u2605 {RaffleWinnerName()}");
+            ImGui.SameLine();
+            if (ImGui.SmallButton("Clear winner")) Raffle.Winner = string.Empty;
+        }
+        else
+        {
+            ImGui.TextColored(Grey, "none marked");
+        }
+        if (ImGui.Button("Target##rafflewin"))
+        {
+            var t = Plugin.GetTargetName();
+            if (string.IsNullOrEmpty(t)) SetStatus("No player targeted.", Red);
+            else { Raffle.Winner = t; SetStatus($"Marked {RaffleWinnerName()} as the raffle winner.", Gold); }
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Mark your targeted player as the winner (archived to history on reset).");
+        ImGui.SameLine();
+        ImGui.SetNextItemWidth(SW(180));
+        ImGui.InputTextWithHint("##rafflewinname", "or type winner name", ref raffleWinnerInput, 64);
+        ImGui.SameLine();
+        if (ImGui.Button("Mark winner"))
+        {
+            if (string.IsNullOrWhiteSpace(raffleWinnerInput)) SetStatus("Enter or target a winner.", Red);
+            else { Raffle.Winner = raffleWinnerInput.Replace('@', '\uE05D'); SetStatus($"Marked {RaffleWinnerName()} as the winner.", Gold); raffleWinnerInput = string.Empty; }
+        }
+        ImGui.SameLine();
+        if (ImGui.Button(showRaffleHistory ? "Hide history" : $"History ({Raffle.History.Count})"))
+            showRaffleHistory = !showRaffleHistory;
+
+        if (showRaffleHistory)
+            DrawGameHistory(Raffle.History, () => Raffle.ClearHistory(), "##raffhist");
+
 
         ImGuiHelpers.ScaledDummy(4f);
         if (ImGui.Button("Copy for external website"))

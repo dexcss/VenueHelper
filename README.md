@@ -107,6 +107,10 @@ Run a venue menu like a restaurant.
 
 ---
 
+## History
+
+The Raffle, Giveaway, DR Tourny, and Bar Game tabs each keep a **history** of past results. When you reset a game, its result is archived first — winner(s), pot, contributors, and details (runner-up, ticket counts, etc.) — so you can look back over the night or the week. Each tab has a History button to view it, full export (TXT/CSV/PDF/XLSX), and a confirmed "Clear history". History is included in backups.
+
 ## Settings
 
 A dedicated tab for global preferences and safety:

@@ -8,6 +8,7 @@ public partial class MainWindow
 {
     private string newBarGameName = string.Empty;
     private string barManualPlayer = string.Empty;
+    private bool showBarHistory = false;
     private int barManualRoll = 0;
     private ChatChannel barAnnounceChannel = ChatChannel.Shout;
     // null = on the game-picker screen; otherwise editing this game.
@@ -157,7 +158,9 @@ public partial class MainWindow
             new ExportItem("Roll history (names, rolls, results)", "bargame_rolls",
                 () => ExportData.BarGameHistory(g)),
             new ExportItem("Player summary (gil paid, plays)", "bargame_players",
-                () => ExportData.BarGamePlayers(g)));
+                () => ExportData.BarGamePlayers(g)),
+            new ExportItem("Game history (past rounds, winners)", "bargame_results",
+                () => ExportData.GameHistory("Bar Game History", Bar.BarHistory)));
 
         ImGuiHelpers.ScaledDummy(6f);
         ImGui.TextColored(Gold, g.Name);
@@ -237,7 +240,29 @@ public partial class MainWindow
             ImGui.PopStyleColor();
         }
         ImGui.SameLine();
-        if (ImGui.Button("Clear rolls")) Bar.ClearPlays(g);
+        if (ImGui.Button("Clear rolls"))
+            ImGui.OpenPopup("##barclearrolls");
+        if (ImGui.BeginPopup("##barclearrolls"))
+        {
+            WrapText(Red, "Clear this round? The winner and pot are saved to History first, then the rolls/players are cleared.");
+            if (ImGui.Button("Yes, clear"))
+            {
+                Bar.ClearPlays(g);
+                SetStatus("Round archived to history and cleared.", Green);
+                ImGui.CloseCurrentPopup();
+            }
+            ImGui.SameLine();
+            if (ImGui.Button("Cancel")) ImGui.CloseCurrentPopup();
+            ImGui.EndPopup();
+        }
+        ImGui.SameLine();
+        if (ImGui.Button(showBarHistory ? "Hide history" : $"History ({Bar.BarHistory.Count})"))
+            showBarHistory = !showBarHistory;
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Past rounds (winner + pot). A round is archived when you Clear rolls.");
+
+        if (showBarHistory)
+            DrawGameHistory(Bar.BarHistory, () => Bar.ClearBarHistory(), "##barhist");
 
         if (g.EntryCost > 0)
             WrapText(Grey, $"Each {g.EntryCost:N0} gil traded = 1 roll. Players roll {BarGameService.RollCommand(g)}.");

@@ -7,6 +7,7 @@ namespace VenueHelper.Windows;
 public partial class MainWindow
 {
     private string deathrollManualName = string.Empty;
+    private bool showDeathrollHistory = false;
 
     private DeathrollManager Dr => Plugin.Deathroll;
 
@@ -150,14 +151,27 @@ public partial class MainWindow
 
         if (ImGui.Button("Reset Bracket"))
             ImGui.OpenPopup("##drreset");
+        ImGui.SameLine();
+        if (ImGui.Button(showDeathrollHistory ? "Hide history" : $"History ({Dr.History.Count})"))
+            showDeathrollHistory = !showDeathrollHistory;
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Past tournaments (champion + runner-up). A completed tournament is archived when you reset.");
+        ImGui.SameLine();
+        DrawExportButton("##export_dr",
+            new ExportItem("History (past tournaments)", "dr_history", () => ExportData.GameHistory("Tournament History", Dr.History)));
         if (ImGui.BeginPopup("##drreset"))
         {
-            ImGui.TextColored(Red, "Are you sure? This clears the bracket and all players.");
-            if (ImGui.Button("Yes, reset")) { Dr.ClearAll(); SetStatus("Bracket reset.", Red); ImGui.CloseCurrentPopup(); }
+            WrapText(Red, champ != null
+                ? "Reset the bracket? The champion is saved to History first, then the bracket and players are cleared."
+                : "Are you sure? This clears the bracket and all players. (Only completed tournaments are archived.)");
+            if (ImGui.Button("Yes, reset")) { Dr.ClearAll(); SetStatus(champ != null ? "Tournament archived and bracket reset." : "Bracket reset.", Green); ImGui.CloseCurrentPopup(); }
             ImGui.SameLine();
             if (ImGui.Button("Cancel")) ImGui.CloseCurrentPopup();
             ImGui.EndPopup();
         }
+
+        if (showDeathrollHistory)
+            DrawGameHistory(Dr.History, () => Dr.ClearHistory(), "##drhist");
 
         ImGuiHelpers.ScaledDummy(6f);
 

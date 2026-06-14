@@ -295,6 +295,62 @@ public partial class MainWindow : Window, IDisposable
         statusTab = currentTab;
     }
 
+    // Draws a shared game-history table (Raffle/DR/Bar Game) with a confirmed
+    // "Clear history" button. popupId must be unique per tab.
+    private void DrawGameHistory(System.Collections.Generic.IReadOnlyList<Data.GameHistoryEntry> history, Action clear, string popupId)
+    {
+        ImGuiHelpers.ScaledDummy(4f);
+        if (history.Count == 0)
+        {
+            WrapText(Grey, "No past results yet. When you reset, the result is archived here.");
+            return;
+        }
+
+        const ImGuiTableFlags hflags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg
+                                       | ImGuiTableFlags.ScrollY | ImGuiTableFlags.SizingStretchProp;
+        if (ImGui.BeginTable($"{popupId}_tbl", 5, hflags, new Vector2(0, SW(200))))
+        {
+            ImGui.TableSetupScrollFreeze(0, 1);
+            ImGui.TableSetupColumn("When", ImGuiTableColumnFlags.WidthFixed, SW(110));
+            ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, SW(90));
+            ImGui.TableSetupColumn("Winner", ImGuiTableColumnFlags.WidthStretch, 1.2f);
+            ImGui.TableSetupColumn("Pot", ImGuiTableColumnFlags.WidthFixed, SW(80));
+            ImGui.TableSetupColumn("Details", ImGuiTableColumnFlags.WidthStretch, 1.8f);
+            ImGui.TableHeadersRow();
+            foreach (var h in history)
+            {
+                ImGui.TableNextRow();
+                ImGui.TableNextColumn();
+                ImGui.AlignTextToFramePadding();
+                ImGui.TextColored(Grey, h.When.ToString("MM-dd HH:mm"));
+                ImGui.TableNextColumn();
+                ImGui.TextColored(Blue, h.Kind);
+                ImGui.TableNextColumn();
+                ImGui.TextColored(Gold, h.Winner);
+                ImGui.TableNextColumn();
+                ImGui.TextColored(Green, h.PotShort);
+                if (ImGui.IsItemHovered() && h.Pot > 0) ImGui.SetTooltip($"{h.Pot:N0} gil");
+                ImGui.TableNextColumn();
+                ImGui.TextUnformatted(h.Details);
+            }
+            ImGui.EndTable();
+        }
+
+        ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.45f, 0.15f, 0.15f, 1f));
+        if (ImGui.SmallButton("Clear history")) ImGui.OpenPopup(popupId);
+        ImGui.PopStyleColor();
+        if (ImGui.BeginPopup(popupId))
+        {
+            ImGui.TextColored(Red, "ARE YOU SURE? Delete all history for this tab?");
+            ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.6f, 0.1f, 0.1f, 1f));
+            if (ImGui.Button("Yes, delete all")) { clear(); ImGui.CloseCurrentPopup(); }
+            ImGui.PopStyleColor();
+            ImGui.SameLine();
+            if (ImGui.Button("Cancel")) ImGui.CloseCurrentPopup();
+            ImGui.EndPopup();
+        }
+    }
+
     private void DrawTabStatus(string tab)
     {
         if (statusTab != tab || string.IsNullOrEmpty(statusMessage))

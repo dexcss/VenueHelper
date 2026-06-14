@@ -3,7 +3,7 @@
     <PropertyGroup>
         <Authors>Akari</Authors>
         <AssemblyName>VenueHelper</AssemblyName>
-        <Version>1.4.0.3</Version>
+        <Version>1.4.1.0</Version>
         <Description>All-in-one FFXIV venue host toolkit: attendance, raffles, auctions, giveaways, deathroll tournaments, bar games, and announcements.</Description>
     </PropertyGroup>
 

@@ -68,10 +68,42 @@ public class DeathrollManager
 
     public void ClearAll()
     {
+        ArchiveCurrent();
         Players.Clear();
         Matches.Clear();
         Config.DeathrollBuilt = false;
         Config.DeathrollActiveMatch = string.Empty;
+        Config.Save();
+    }
+
+    public IReadOnlyList<Data.GameHistoryEntry> History => Config.DeathrollHistory;
+
+    // Archive the finished tournament's champion (and runner-up) to history.
+    public bool ArchiveCurrent()
+    {
+        var champ = ChampionPlayer();
+        if (champ == null) return false; // only archive a completed tournament
+
+        // Runner-up = loser of the final match.
+        var final = Matches.OrderByDescending(m => m.Round).FirstOrDefault();
+        var runnerUp = final?.Loser != null ? GetPlayer(final.Loser)?.NameOnly : null;
+        var kind = Config.DeathrollKind == 1 ? "Double-elim" : "Single-elim";
+
+        Config.DeathrollHistory.Insert(0, new Data.GameHistoryEntry
+        {
+            When = DateTime.Now,
+            Kind = "Tournament",
+            Winner = champ.NameOnly,
+            Pot = 0,
+            Details = $"{kind}, {Players.Count} players" + (string.IsNullOrEmpty(runnerUp) ? "" : $", runner-up {runnerUp}"),
+        });
+        Config.Save();
+        return true;
+    }
+
+    public void ClearHistory()
+    {
+        Config.DeathrollHistory.Clear();
         Config.Save();
     }
 
