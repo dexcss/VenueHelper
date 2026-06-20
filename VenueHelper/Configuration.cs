@@ -130,6 +130,8 @@ public class Configuration : IPluginConfiguration
         this.pluginInterface = pi;
         MigrateVenues();
         MigrateMenu();
+        // Persist any migration/dedupe cleanup so it sticks across restarts.
+        Save();
     }
 
     // Ensure there's at least one menu profile, and migrate any legacy flat
@@ -175,6 +177,24 @@ public class Configuration : IPluginConfiguration
             MenuProfiles.Add(new MenuProfile("Default Menu"));
         if (SelectedMenuProfile < 0 || SelectedMenuProfile >= MenuProfiles.Count)
             SelectedMenuProfile = 0;
+
+        // Heal any duplicate macros that an earlier build may have persisted
+        // (exact duplicates: same label + same step commands/waits). Keeps the
+        // first of each. This is idempotent and safe to run every load.
+        foreach (var profile in MenuProfiles)
+        {
+            var seen = new HashSet<string>();
+            var deduped = new List<MenuMacro>();
+            foreach (var m in profile.Macros)
+            {
+                var key = (m.Label ?? string.Empty) + "\u0001"
+                    + string.Join("\u0002", m.Steps.Select(s => (s.Command ?? string.Empty) + "@" + s.DelayAfter));
+                if (seen.Add(key))
+                    deduped.Add(m);
+            }
+            if (deduped.Count != profile.Macros.Count)
+                profile.Macros = deduped;
+        }
     }
 
     public MenuProfile ActiveMenuProfile
