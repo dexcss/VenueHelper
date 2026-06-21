@@ -40,6 +40,9 @@ public class Configuration : IPluginConfiguration
     public long TicketCost = 100000;
     // When a trade is detected, auto-credit it to the raffle as tickets.
     public bool RaffleAutoTrade = true;
+    // Master enable for the raffle: when off, no trade tracking happens at all.
+    // The host turns this on when a raffle is running.
+    public bool RaffleActive = false;
     public string RaffleWinner = string.Empty; // current raffle winner (NameOnly or full)
     // House cut percent for raffles (e.g. 20 for an 80/20 split). Whole numbers.
     public float RaffleHouseCutPercent = 0f;

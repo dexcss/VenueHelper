@@ -16,6 +16,8 @@ public enum WinCondition
     ClosestTo,        // closest to a target number wins
     SurvivalStreak,   // hit a success number N times in a row (e.g. six 1s); a
                       // miss ends the run
+    PrizeTiers,       // a roll is matched against a list of number-ranges, each
+                      // with its own payout, plus an optional jackpot number
 }
 
 // The three survival sub-modes.
@@ -71,6 +73,19 @@ public class BarGame
     public int TierThreshold = 3;
     public long TierPerStep = 100000;
 
+    // ---- Prize-tier mode (WinCondition.PrizeTiers) --------------------
+    // Each roll is checked against these ranges (first match wins its payout).
+    public List<PrizeTier> PrizeTiers = new();
+    // Optional progressive jackpot: rolling exactly JackpotNumber wins the
+    // running jackpot. The jackpot starts at JackpotStart and grows by
+    // JackpotPerBuyIn for each paid buy-in.
+    public bool JackpotEnabled = false;
+    public int JackpotNumber = 100;
+    public long JackpotStart = 5000000;
+    public long JackpotPerBuyIn = 0;
+    public long CurrentJackpot = 0;     // live running jackpot
+    public bool JackpotStarted = false; // seeded to JackpotStart on first use
+
     // Cost & pot.
     public long EntryCost = 0;          // gil per play (buy-in)
     public bool StackingPot = false;    // each entry adds to the pot
@@ -99,4 +114,19 @@ public class BarGame
 
     public BarGame() { }
     public BarGame(string name) { Name = name; }
+}
+
+// One payout tier for WinCondition.PrizeTiers: a roll in [Low, High] inclusive
+// pays Amount gil. Tiers are checked in list order; the first match wins.
+[Serializable]
+public class PrizeTier
+{
+    public int Low = 1;
+    public int High = 100;
+    public long Amount = 0;
+
+    public PrizeTier() { }
+    public PrizeTier(int low, int high, long amount) { Low = low; High = high; Amount = amount; }
+
+    public bool Contains(int roll) => roll >= Low && roll <= High;
 }

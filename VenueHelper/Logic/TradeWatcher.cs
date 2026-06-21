@@ -30,7 +30,8 @@ public unsafe class TradeWatcher
     public void Update()
     {
         if (Plugin.Panic) return; // master kill switch: don't watch trades
-        if (!Plugin.Configuration.RaffleAutoTrade)
+        // Only watch trades when a raffle is actively running AND auto-credit is on.
+        if (!Plugin.Configuration.RaffleActive || !Plugin.Configuration.RaffleAutoTrade)
         {
             ResetSnapshot();
             WasOpen = false;

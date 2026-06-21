@@ -40,6 +40,20 @@ public partial class MainWindow
                 () => ExportData.GameHistory("Raffle History", Raffle.History)));
         WrapText(Grey, "Enter how many tickets each player bought, then assign 0-999 for the draw.");
 
+        // ---- Raffle enable (master tracking switch) -------------------
+        var active = Config.RaffleActive;
+        ImGui.PushStyleColor(ImGuiCol.Text, active ? new Vector4(0.4f, 0.85f, 0.4f, 1f) : new Vector4(0.7f, 0.7f, 0.7f, 1f));
+        if (ImGui.Checkbox(active ? "Raffle ON (watching trades for tickets)" : "Enable raffle (start watching trades)", ref active))
+        {
+            Config.RaffleActive = active;
+            Config.Save();
+            SetStatus(active ? "Raffle enabled \u2014 trades will be credited as tickets." : "Raffle disabled \u2014 not watching trades.", active ? Green : Grey);
+        }
+        ImGui.PopStyleColor();
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("When off, the raffle does NOT watch or claim any trades. Turn it on while a raffle is running, off when it's done.");
+
+
         // Warn if a bar game is currently capturing trades \u2014 they'd be taken as
         // bar-game buy-ins instead of raffle tickets.
         var activeGame = Plugin.BarGames.ActiveTrackingGame;

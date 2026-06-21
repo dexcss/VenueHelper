@@ -109,6 +109,7 @@ public class RaffleService
         ArchiveCurrent();
         Config.RaffleEntries.Clear();
         Config.RaffleWinner = string.Empty;
+        Config.RaffleActive = false; // stop watching trades when the raffle ends
         Config.Save();
     }
 
@@ -165,7 +166,7 @@ public class RaffleService
     // The raffle is "claiming trades" when auto-credit is on and it has entries
     // (i.e. a raffle is in progress). Used to warn against running a bar game's
     // trade capture at the same time, since both can't take trades at once.
-    public bool IsClaimingTrades => Config.RaffleAutoTrade && Config.RaffleEntries.Count > 0;
+    public bool IsClaimingTrades => Config.RaffleActive && Config.RaffleAutoTrade && Config.RaffleEntries.Count > 0;
 
     // Assign numbers starting at 0 in list order, each player getting a
     // contiguous block. If the total exceeds 1000 (0-999), numbers are left

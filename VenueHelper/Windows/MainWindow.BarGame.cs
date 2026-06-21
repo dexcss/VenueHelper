@@ -17,7 +17,7 @@ public partial class MainWindow
     private bool barEditMode = false;
 
     private static readonly string[] RollKindLabels = { "/random (0-999)", "/random N", "/dice N" };
-    private static readonly string[] WinCondLabels = { "Specific number(s)", "In a range", "Highest roll", "Lowest roll", "Closest to", "Survival streak (X in a row)" };
+    private static readonly string[] WinCondLabels = { "Specific number(s)", "In a range", "Highest roll", "Lowest roll", "Closest to", "Survival streak (X in a row)", "Prize tiers (+ optional jackpot)" };
     private static readonly string[] SurvivalModeLabels = { "Same number each roll", "Higher/lower than a set number", "Higher/lower than previous roll (call it)" };
     private static readonly string[] SurvivalPrizeLabels = { "Fixed (reach a streak, win the pot/amount)", "Tiered (pays per success past a threshold)", "High score (longest streak wins the pot)" };
     private static readonly string[] PrizeKindLabels = { "Fixed gil", "% of pot" };
@@ -172,6 +172,17 @@ public partial class MainWindow
         ImGui.PopTextWrapPos();
 
         ImGuiHelpers.ScaledDummy(6f);
+
+        // ---- Live jackpot (prize-tier games) --------------------------
+        if (g.Condition == WinCondition.PrizeTiers && g.JackpotEnabled)
+        {
+            if (!g.JackpotStarted) { g.CurrentJackpot = g.JackpotStart; g.JackpotStarted = true; }
+            ImGui.TextColored(new Vector4(1f, 0.84f, 0.2f, 1f),
+                $"\uE0BE JACKPOT (roll {g.JackpotNumber}): {g.CurrentJackpot:N0} gil");
+            ImGui.SameLine();
+            if (ImGui.SmallButton("Reset jackpot")) { g.CurrentJackpot = g.JackpotStart; g.JackpotStarted = true; Config.Save(); }
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip($"Reset the jackpot back to its starting seed ({GilFormat.Short(g.JackpotStart)}).");
+        }
 
         // ---- Pot / Prize ----------------------------------------------
         if (g.StackingPot || g.Prize == PrizeKind.PercentOfPot)
@@ -509,7 +520,19 @@ public partial class MainWindow
                 ImGui.TableNextColumn();
                 ImGui.TextColored(new Vector4(0.85f, 0.85f, 0.85f, 1f), $"{play.Roll}");
                 ImGui.TableNextColumn();
-                ImGui.TextColored(isWinner ? Green : Grey, isWinner ? "WIN" : "-");
+                if (g.Condition == WinCondition.PrizeTiers)
+                {
+                    var (amt, jack) = BarGameService.ResolveTierPrize(g, play.Roll);
+                    if (amt > 0)
+                        ImGui.TextColored(jack ? new Vector4(1f, 0.84f, 0.2f, 1f) : Green,
+                            jack ? $"JACKPOT {GilFormat.Short(amt)}" : GilFormat.Short(amt));
+                    else
+                        ImGui.TextColored(Grey, "-");
+                }
+                else
+                {
+                    ImGui.TextColored(isWinner ? Green : Grey, isWinner ? "WIN" : "-");
+                }
                 ImGui.TableNextColumn();
                 var pb = g.Players.TryGetValue(play.FullName, out var pl) ? pl : null;
                 WrapText(Grey, g.EntryCost > 0 && pb != null ? pb.PlaysRemaining(g.EntryCost).ToString() : "-");
@@ -749,6 +772,65 @@ public partial class MainWindow
                 else // HighScore
                 {
                     WrapText(Grey, "Everyone plays; each player's score is their longest streak. The player with the highest streak wins the pot (set in Pot & entry below) \u2014 you declare the winner when the round's done. The current leader is highlighted live in the play view.");
+                }
+                break;
+
+            case WinCondition.PrizeTiers:
+                WrapText(Grey, "Each roll is checked against the tiers below (first matching range wins its payout). Add a jackpot for an exact-number hit that grows with every buy-in.");
+                ImGuiHelpers.ScaledDummy(2f);
+
+                PrizeTier? removeTier = null;
+                for (var ti = 0; ti < g.PrizeTiers.Count; ti++)
+                {
+                    var t = g.PrizeTiers[ti];
+                    ImGui.PushID($"tier{ti}");
+                    var tl = t.Low; var th = t.High;
+                    ImGui.TextUnformatted("Roll"); ImGui.SameLine();
+                    ImGui.SetNextItemWidth(SW(70));
+                    if (ImGui.InputInt("##low", ref tl, 0, 0)) { t.Low = tl; Config.Save(); }
+                    ImGui.SameLine(); ImGui.TextUnformatted("to"); ImGui.SameLine();
+                    ImGui.SetNextItemWidth(SW(70));
+                    if (ImGui.InputInt("##high", ref th, 0, 0)) { t.High = th; Config.Save(); }
+                    ImGui.SameLine(); ImGui.TextUnformatted("wins"); ImGui.SameLine();
+                    var amtText = t.Amount == 0 ? string.Empty : t.Amount.ToString();
+                    ImGui.SetNextItemWidth(SW(120));
+                    if (ImGui.InputTextWithHint("##amt", "gil (200k)", ref amtText, 24))
+                    {
+                        if (GilFormat.TryParse(amtText, out var parsed)) { t.Amount = Math.Max(0, parsed); Config.Save(); }
+                        else if (string.IsNullOrWhiteSpace(amtText)) { t.Amount = 0; Config.Save(); }
+                    }
+                    ImGui.SameLine();
+                    if (ImGui.SmallButton("x")) removeTier = t;
+                    ImGui.PopID();
+                }
+                if (removeTier != null) { g.PrizeTiers.Remove(removeTier); Config.Save(); }
+                if (ImGui.Button("+ Add tier")) { g.PrizeTiers.Add(new PrizeTier(1, 10, 0)); Config.Save(); }
+
+                ImGuiHelpers.ScaledDummy(4f);
+                var jpOn = g.JackpotEnabled;
+                if (ImGui.Checkbox("Progressive jackpot", ref jpOn)) { g.JackpotEnabled = jpOn; Config.Save(); }
+                if (g.JackpotEnabled)
+                {
+                    var jn = g.JackpotNumber;
+                    ImGui.SetNextItemWidth(SW(90));
+                    if (ImGui.InputInt("Jackpot number", ref jn, 0, 0)) { g.JackpotNumber = jn; Config.Save(); }
+
+                    var startText = g.JackpotStart == 0 ? string.Empty : g.JackpotStart.ToString();
+                    ImGui.SetNextItemWidth(SW(130));
+                    if (ImGui.InputTextWithHint("Starting jackpot", "e.g. 5M", ref startText, 24))
+                    {
+                        if (GilFormat.TryParse(startText, out var js)) { g.JackpotStart = Math.Max(0, js); Config.Save(); }
+                        else if (string.IsNullOrWhiteSpace(startText)) { g.JackpotStart = 0; Config.Save(); }
+                    }
+
+                    var perText = g.JackpotPerBuyIn == 0 ? string.Empty : g.JackpotPerBuyIn.ToString();
+                    ImGui.SetNextItemWidth(SW(130));
+                    if (ImGui.InputTextWithHint("Grows per buy-in", "e.g. 100k", ref perText, 24))
+                    {
+                        if (GilFormat.TryParse(perText, out var jp)) { g.JackpotPerBuyIn = Math.Max(0, jp); Config.Save(); }
+                        else if (string.IsNullOrWhiteSpace(perText)) { g.JackpotPerBuyIn = 0; Config.Save(); }
+                    }
+                    WrapText(Grey, $"Current jackpot: {GilFormat.Short(g.JackpotStarted ? g.CurrentJackpot : g.JackpotStart)}. It seeds at the starting amount, grows each buy-in, and resets after someone hits {g.JackpotNumber}.");
                 }
                 break;
         }

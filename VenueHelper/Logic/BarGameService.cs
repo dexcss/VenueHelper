@@ -98,6 +98,24 @@ public class BarGameService
         var win = WinDescription(g);
         var cost = g.EntryCost > 0 ? $" ({g.EntryCost:N0} gil to play)" : "";
 
+        // Prize-tier games: list each tier and the jackpot.
+        if (g.Condition == WinCondition.PrizeTiers)
+        {
+            var parts = new List<string>();
+            foreach (var t in g.PrizeTiers.OrderByDescending(t => t.Amount))
+            {
+                var range = t.Low == t.High ? $"{t.Low}" : $"{t.Low}-{t.High}";
+                parts.Add($"{range} wins {GilFormat.Short(t.Amount)}");
+            }
+            if (g.JackpotEnabled)
+            {
+                var jp = g.JackpotStarted ? g.CurrentJackpot : g.JackpotStart;
+                parts.Add($"{g.JackpotNumber} wins the JACKPOT ({GilFormat.Short(jp)})");
+            }
+            var body = parts.Count > 0 ? string.Join(", ", parts) : "see rules";
+            return $"{g.Name}: {cmd} \u2014 {body}!{cost}";
+        }
+
         // Survival games: the goal text already describes the prize for tiered,
         // and for fixed we append the flat amount.
         if (g.Condition == WinCondition.SurvivalStreak)
@@ -134,6 +152,7 @@ public class BarGameService
     {
         WinCondition.SpecificNumbers => g.WinningNumbers.Contains(roll),
         WinCondition.InRange => roll >= g.RangeLow && roll <= g.RangeHigh,
+        WinCondition.PrizeTiers => ResolveTierPrize(g, roll).amount > 0,
         _ => false,
     };
 
@@ -183,6 +202,16 @@ public class BarGameService
                 var won = g.Players.Values.FirstOrDefault(p => p.StreakWon);
                 winner = won != null ? won.NameOnly : "(none)";
             }
+        }
+        else if (g.Condition == WinCondition.PrizeTiers)
+        {
+            // Possibly several winners; list each paying roll with its amount.
+            var wins = g.Plays
+                .Select(p => (p, prize: ResolveTierPrize(g, p.Roll)))
+                .Where(x => x.prize.amount > 0)
+                .Select(x => $"{x.p.NameOnly} {x.p.Roll}\u2192{GilFormat.Short(x.prize.amount)}{(x.prize.jackpot ? " (JACKPOT)" : "")}")
+                .ToList();
+            winner = wins.Count > 0 ? string.Join(", ", wins) : "(no winners)";
         }
         else
         {
@@ -347,9 +376,30 @@ public class BarGameService
     // stacking.
     private void GrowPot(BarGame g, int plays)
     {
-        if (!g.StackingPot || plays <= 0) return;
+        if (plays <= 0) return;
+
+        // Progressive jackpot grows by a set amount per paid buy-in.
+        if (g.JackpotEnabled)
+        {
+            if (!g.JackpotStarted) { g.CurrentJackpot = g.JackpotStart; g.JackpotStarted = true; }
+            g.CurrentJackpot += g.JackpotPerBuyIn * plays;
+        }
+
+        if (!g.StackingPot) return;
         if (!g.PotStarted) { g.CurrentPot = g.StartingPot; g.PotStarted = true; }
         g.CurrentPot += g.EntryCost * plays;
+    }
+
+    // Resolve a prize-tier roll: returns the gil won (0 = loss) and whether it
+    // was the jackpot. Tiers are checked in order; jackpot number takes priority.
+    public static (long amount, bool jackpot) ResolveTierPrize(BarGame g, int roll)
+    {
+        if (g.JackpotEnabled && roll == g.JackpotNumber)
+            return (g.JackpotStarted ? g.CurrentJackpot : g.JackpotStart, true);
+        foreach (var t in g.PrizeTiers)
+            if (t.Contains(roll))
+                return (t.Amount, false);
+        return (0, false);
     }
 
     // Hook calls this on every /random or /dice while a game is tracking.
@@ -529,6 +579,15 @@ public class BarGameService
 
         var won = IsWinningRoll(g, result);
         g.Plays.Add(new BarGamePlay(fullName, result, normalized, won));
+
+        // Prize-tier jackpot: if this roll hit the jackpot number, it's claimed,
+        // so reset the running jackpot back to its starting seed for next time.
+        if (g.Condition == WinCondition.PrizeTiers && g.JackpotEnabled && result == g.JackpotNumber)
+        {
+            Plugin.Log.Information($"Bar game: {player.NameOnly} hit the jackpot ({g.CurrentJackpot:N0} gil)!");
+            g.CurrentJackpot = g.JackpotStart;
+            g.JackpotStarted = true;
+        }
         Config.Save();
     }
 
