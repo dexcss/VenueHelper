@@ -82,6 +82,10 @@ public unsafe class VenueCounter
     // render range, so a departure only counts after a grace period.
     private readonly Dictionary<string, DateTime> lastSeenAt = new();
     private static readonly TimeSpan DepartureGrace = TimeSpan.FromMinutes(30);
+    // Accumulated visit-seconds are flushed to disk no more often than this,
+    // instead of every scan (which serialized the whole config each second).
+    private static readonly TimeSpan TimeFlushInterval = TimeSpan.FromSeconds(30);
+    private DateTime lastTimeFlush = DateTime.MinValue;
 
     public VenueCounter(Plugin plugin)
     {
@@ -280,7 +284,10 @@ public unsafe class VenueCounter
             {
                 Venue.VisitSeconds.TryGetValue(key, out var secs);
                 Venue.VisitSeconds[key] = secs + (long)Math.Round(elapsed);
-                allNightDirty = true;
+                // NOTE: crediting seconds does NOT set allNightDirty. Saving the
+                // whole config every second (per player!) was the main cause of
+                // lag. Time is flushed on a slow cadence (see end of Update) and
+                // whenever the player set or sessions actually change.
 
                 // Visit sessions: open one if this player has no currently-open
                 // session, otherwise just refresh their last-seen time.
@@ -292,9 +299,14 @@ public unsafe class VenueCounter
                 }
                 var open = sessions.LastOrDefault(s => s.Open);
                 if (open == null)
+                {
                     sessions.Add(new VisitSession(DateTime.Now));
+                    allNightDirty = true; // a new session is worth persisting
+                }
                 else
+                {
                     open.LastSeen = DateTime.Now;
+                }
             }
         }
 
@@ -327,9 +339,18 @@ public unsafe class VenueCounter
             }
         }
 
-        // Persist the all-night set when it grew, so a crash/relog doesn't lose
-        // the night's tally. Save only on change to avoid disk churn each second.
+        // Persist on a meaningful change (new player or session open/close)
+        // immediately. Accumulated seconds are flushed on a slow cadence so we
+        // don't serialize the whole config every scan (the lag culprit).
         if (allNightDirty)
+        {
             Config.Save();
+            lastTimeFlush = DateTime.Now;
+        }
+        else if (trackTime && DateTime.Now - lastTimeFlush >= TimeFlushInterval)
+        {
+            Config.Save();
+            lastTimeFlush = DateTime.Now;
+        }
     }
 }
