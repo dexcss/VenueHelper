@@ -86,6 +86,13 @@ public unsafe class VenueCounter
     // instead of every scan (which serialized the whole config each second).
     private static readonly TimeSpan TimeFlushInterval = TimeSpan.FromSeconds(30);
     private DateTime lastTimeFlush = DateTime.MinValue;
+    // Per-scan ContentId caches (transient, not persisted) to avoid rebuilding
+    // the Name@World string and rescanning sessions every second.
+    private readonly HashSet<ulong> seenThisScan = new();
+    private readonly Dictionary<ulong, string> keyByContentId = new();
+    private readonly Dictionary<ulong, VisitSession> openSession = new();
+    private DateTime lastDepartureSweep = DateTime.MinValue;
+    private static readonly TimeSpan DepartureSweepInterval = TimeSpan.FromSeconds(5);
 
     public VenueCounter(Plugin plugin)
     {
@@ -117,6 +124,7 @@ public unsafe class VenueCounter
         Venue.VisitSeconds.Clear();
         Venue.VisitSessions.Clear();
         lastSeenAt.Clear();
+        openSession.Clear();
         Config.Save();
     }
 
@@ -125,6 +133,7 @@ public unsafe class VenueCounter
         Venue.VisitSeconds.Remove(key);
         Venue.VisitSessions.Remove(key);
         lastSeenAt.Remove(key);
+        openSession.Clear(); // force session re-resolution next scan (cheap)
         Config.Save();
     }
 
@@ -217,6 +226,7 @@ public unsafe class VenueCounter
             }
         }
         lastSeenAt.Clear();
+        openSession.Clear();
     }
 
     public void ResetAllNight()
@@ -246,29 +256,45 @@ public unsafe class VenueCounter
         lastScan = DateTime.Now;
 
         var trackTime = Config.AllNightRunning && Config.TrackVisitTime && elapsed > 0;
+        var addSeconds = (long)Math.Round(elapsed);
 
         var visible = 0;
         var allNightDirty = false;
+        var now = DateTime.Now;
+
+        // Reuse a single scratch set of ContentIds seen this scan (cleared, not
+        // reallocated) so departure detection is a cheap hash lookup.
+        seenThisScan.Clear();
 
         foreach (var o in Plugin.Objects)
         {
+            // Filter to real player characters cheaply BEFORE touching strings.
             if (o is not IPlayerCharacter pc)
                 continue;
+            if (o.SubKind != 4) // 4 = normal player character
+                continue;
 
-            // Skip nameless objects (portraits / adventurer plates show up blank).
-            if (pc.Name.TextValue.Length == 0)
-                continue;
-            // SubKind 4 is a normal player character (matches VenueManager's filter).
-            if (o.SubKind != 4)
-                continue;
+            // ContentId is the game's stable unique identity for a player. Use it
+            // as the fast key for all per-scan work; only build the human-readable
+            // "Name@World" string the first time we see this player (then cache).
+            var cid = pc.GameObjectId;
+            if (cid == 0) continue;
 
             visible++;
+            seenThisScan.Add(cid);
 
-            // Key by Name@World so two players with the same name on different
-            // worlds aren't merged.
-            var key = pc.HomeWorld.ValueNullable != null
-                ? $"{pc.Name.TextValue}\uE05D{pc.HomeWorld.Value.Name}"
-                : pc.Name.TextValue;
+            // Resolve (and cache) the string key for this ContentId. Building it
+            // is the expensive part (name + world resolution + concat), so we do
+            // it once per player rather than every scan.
+            if (!keyByContentId.TryGetValue(cid, out var key))
+            {
+                var name = pc.Name.TextValue;
+                if (name.Length == 0) continue; // nameless portrait/plate
+                key = pc.HomeWorld.ValueNullable != null
+                    ? $"{name}\uE05D{pc.HomeWorld.Value.Name}"
+                    : name;
+                keyByContentId[cid] = key;
+            }
 
             if (TempRunning)
                 TempSeen.Add(key);
@@ -283,40 +309,42 @@ public unsafe class VenueCounter
             if (trackTime)
             {
                 Venue.VisitSeconds.TryGetValue(key, out var secs);
-                Venue.VisitSeconds[key] = secs + (long)Math.Round(elapsed);
-                // NOTE: crediting seconds does NOT set allNightDirty. Saving the
-                // whole config every second (per player!) was the main cause of
-                // lag. Time is flushed on a slow cadence (see end of Update) and
-                // whenever the player set or sessions actually change.
+                Venue.VisitSeconds[key] = secs + addSeconds;
+                lastSeenAt[key] = now;
 
-                // Visit sessions: open one if this player has no currently-open
-                // session, otherwise just refresh their last-seen time.
-                lastSeenAt[key] = DateTime.Now;
-                if (!Venue.VisitSessions.TryGetValue(key, out var sessions))
+                // Open-session lookup is cached per ContentId to avoid the
+                // LastOrDefault scan every second.
+                if (!openSession.TryGetValue(cid, out var open) || open == null || !open.Open)
                 {
-                    sessions = new List<VisitSession>();
-                    Venue.VisitSessions[key] = sessions;
-                }
-                var open = sessions.LastOrDefault(s => s.Open);
-                if (open == null)
-                {
-                    sessions.Add(new VisitSession(DateTime.Now));
-                    allNightDirty = true; // a new session is worth persisting
+                    if (!Venue.VisitSessions.TryGetValue(key, out var sessions))
+                    {
+                        sessions = new List<VisitSession>();
+                        Venue.VisitSessions[key] = sessions;
+                    }
+                    open = sessions.LastOrDefault(s => s.Open);
+                    if (open == null)
+                    {
+                        open = new VisitSession(now);
+                        sessions.Add(open);
+                        allNightDirty = true; // a new session is worth persisting
+                    }
+                    openSession[cid] = open;
                 }
                 else
                 {
-                    open.LastSeen = DateTime.Now;
+                    open.LastSeen = now;
                 }
             }
         }
 
         CurrentlyVisible = visible;
 
-        // Close visit sessions for players not seen within the grace period
-        // (set their Left time to when they were last actually seen).
-        if (Config.AllNightRunning && Config.TrackVisitTime)
+        // Close visit sessions for players not seen within the grace period.
+        // This is a 30-min grace, so checking every scan is wasteful \u2014 sweep at
+        // most once every few seconds.
+        if (Config.AllNightRunning && Config.TrackVisitTime && now - lastDepartureSweep >= DepartureSweepInterval)
         {
-            var now = DateTime.Now;
+            lastDepartureSweep = now;
             foreach (var kv in Venue.VisitSessions)
             {
                 var open = kv.Value.LastOrDefault(s => s.Open);
