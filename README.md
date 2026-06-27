@@ -11,7 +11,7 @@ Open it with `/venuehelper` (aliases `/vhelp`, `/vh`).
 In-game, open `/xlsettings` → **Experimental** → **Custom Plugin Repositories**, add this URL, and click the **+** then the **save** (floppy) icon:
 
 ```
-https://raw.githubusercontent.com/dexcss/DalamudPlugins/main/repo.json
+https://raw.githubusercontent.com/dexcss/VenueHelper/main/repo.json
 ```
 
 Then open `/xlplugins`, search for **Venue Helper**, and install.
