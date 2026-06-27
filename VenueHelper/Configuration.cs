@@ -133,8 +133,64 @@ public class Configuration : IPluginConfiguration
         this.pluginInterface = pi;
         MigrateVenues();
         MigrateMenu();
-        // Persist any migration/dedupe cleanup so it sticks across restarts.
-        Save();
+        // Prune any runaway visit-tracking data so a huge config can't OOM on
+        // load (serializing it was throwing OutOfMemoryException for heavy users).
+        var pruned = PruneTrackingData();
+        // Only save if pruning actually changed something; otherwise avoid a
+        // full serialize on every startup (which itself was a load-time cost).
+        // Guard it: a serialize failure must never stop the plugin from loading.
+        if (pruned)
+        {
+            try { Save(); }
+            catch (Exception ex)
+            {
+                Plugin.Log.Error(ex, "[Venue Helper] Failed to save pruned config at startup; continuing.");
+            }
+        }
+    }
+
+    // Caps the per-venue visit-tracking collections to sane sizes. Closed/old
+    // sessions and the lowest-time visitors are dropped first. Returns true if
+    // anything was removed.
+    private bool PruneTrackingData()
+    {
+        const int maxVisitorsPerVenue = 2000;   // keep the top-N by time
+        const int maxSessionsPerPlayer = 50;    // most recent sessions only
+        var changed = false;
+
+        foreach (var v in Venues)
+        {
+            // Cap sessions per player (keep the most recent).
+            foreach (var kv in v.VisitSessions)
+            {
+                if (kv.Value.Count > maxSessionsPerPlayer)
+                {
+                    var keep = kv.Value
+                        .OrderByDescending(s => s.LastSeen)
+                        .Take(maxSessionsPerPlayer)
+                        .OrderBy(s => s.Arrived)
+                        .ToList();
+                    v.VisitSessions[kv.Key] = keep;
+                    changed = true;
+                }
+            }
+
+            // Cap total tracked visitors (keep the highest-time ones).
+            if (v.VisitSeconds.Count > maxVisitorsPerVenue)
+            {
+                var keepKeys = v.VisitSeconds
+                    .OrderByDescending(kv => kv.Value)
+                    .Take(maxVisitorsPerVenue)
+                    .Select(kv => kv.Key)
+                    .ToHashSet();
+                v.VisitSeconds = v.VisitSeconds.Where(kv => keepKeys.Contains(kv.Key))
+                    .ToDictionary(kv => kv.Key, kv => kv.Value);
+                v.VisitSessions = v.VisitSessions.Where(kv => keepKeys.Contains(kv.Key))
+                    .ToDictionary(kv => kv.Key, kv => kv.Value);
+                changed = true;
+            }
+        }
+        return changed;
     }
 
     // Ensure there's at least one menu profile, and migrate any legacy flat
@@ -197,9 +253,45 @@ public class Configuration : IPluginConfiguration
             }
             if (deduped.Count != profile.Macros.Count)
                 profile.Macros = deduped;
+
+            // Heal duplicate menu ITEMS and their serve-steps the same way. A
+            // serialization bug doubled the active menu on every save, which let
+            // items/steps compound into hundreds of thousands of entries.
+            foreach (var item in profile.Items)
+            {
+                if (item.ServeSteps.Count <= 1) continue;
+                var stepSeen = new HashSet<string>();
+                var stepDeduped = new List<ServeStep>();
+                foreach (var s in item.ServeSteps)
+                {
+                    var sk = (s.Command ?? string.Empty) + "@" + s.DelayAfter;
+                    if (stepSeen.Add(sk))
+                        stepDeduped.Add(s);
+                }
+                if (stepDeduped.Count != item.ServeSteps.Count)
+                    item.ServeSteps = stepDeduped;
+            }
+
+            var itemSeen = new HashSet<string>();
+            var itemDeduped = new List<MenuItem>();
+            foreach (var it in profile.Items)
+            {
+                var key = (it.Name ?? string.Empty) + "\u0001" + (it.Category ?? string.Empty)
+                    + "\u0001" + it.Price + "\u0001" + (it.Emote ?? string.Empty) + "\u0001"
+                    + string.Join("\u0002", it.ServeSteps.Select(s => (s.Command ?? string.Empty) + "@" + s.DelayAfter));
+                if (itemSeen.Add(key))
+                    itemDeduped.Add(it);
+            }
+            if (itemDeduped.Count != profile.Items.Count)
+                profile.Items = itemDeduped;
         }
     }
 
+    // Computed accessor for the currently-selected profile. MUST NOT be
+    // serialized: it returns a full MenuProfile, and Newtonsoft would otherwise
+    // write a complete second copy of the active menu on every save (this caused
+    // configs to balloon to hundreds of MB and OOM on load).
+    [Newtonsoft.Json.JsonIgnore]
     public MenuProfile ActiveMenuProfile
     {
         get
