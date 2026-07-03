@@ -161,7 +161,7 @@ public partial class MainWindow
             if (previewLines.Count == 0 && !string.IsNullOrWhiteSpace(item.Emote))
                 previewLines.Add(ChatSender.ResolveCommand(item.Emote));
 
-            var cardH = SW(58 + (hasSeq ? 16 * Math.Min(previewLines.Count, 4) + 8 : 0));
+            var cardH = SW(58 + (hasSeq ? 20 * (previewLines.Count + 1) + 8 : 0));
             if (ImGui.BeginChild($"##item{i}", new Vector2(0, cardH), true))
             {
                 // Name + price, with the Serve button right-aligned.
@@ -189,9 +189,11 @@ public partial class MainWindow
 
                 if (hasSeq)
                 {
-                    ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + SW(520));
-                    ImGui.TextColored(Grey, "On serve:  " + string.Join("  \u2192  ", previewLines));
-                    ImGui.PopTextWrapPos();
+                    ImGui.TextColored(Grey, "On serve:");
+                    ImGui.Indent(SW(12));
+                    foreach (var line in previewLines)
+                        ImGui.TextColored(Grey, line);
+                    ImGui.Unindent(SW(12));
                 }
             }
             ImGui.EndChild();
