@@ -73,12 +73,14 @@ public static class ExportData
             .Select(s => (IReadOnlyList<string>)new List<string>
             {
                 s.ItemName,
+                Math.Max(1, s.Quantity).ToString(),
+                s.UnitPrice.ToString(),
                 s.Price.ToString(),
                 s.Buyer ?? string.Empty,
                 s.When.ToString("yyyy-MM-dd HH:mm:ss"),
             })
             .ToList();
-        return new TableData("Menu Sales", new[] { "Item", "Price", "Buyer", "Time" }, rows);
+        return new TableData("Menu Sales", new[] { "Item", "Qty", "Unit Price", "Total", "Buyer", "Time" }, rows);
     }
 
     public static TableData MenuTotals(IReadOnlyList<MenuSale> sales)
@@ -88,7 +90,9 @@ public static class ExportData
             .Select(grp => (IReadOnlyList<string>)new List<string>
             {
                 grp.Key,
-                grp.Count().ToString(),
+                // "Sold" is the number of ITEMS sold (summing quantities), not
+                // the number of order rows.
+                grp.Sum(s => Math.Max(1, s.Quantity)).ToString(),
                 grp.Sum(s => s.Price).ToString(),
             })
             .OrderByDescending(r => long.Parse(r[2]))

@@ -95,9 +95,13 @@ public class MenuService
 
     // Record a sale, then perform the item's serve sequence \u2014 each step is a
     // command/emote with its own delay-after, like a macro's <wait.N> lines.
-    public (bool ok, string message) Serve(MenuItem item, string buyer)
+    // quantity > 1 logs a SINGLE sale of that many (priced qty x unit), and the
+    // serve sequence still runs once (so ordering 3 drinks doesn't triple-spam
+    // the emotes).
+    public (bool ok, string message) Serve(MenuItem item, string buyer, int quantity = 1)
     {
-        Profile.Sales.Add(new MenuSale(item.Name, item.Price, buyer?.Trim() ?? string.Empty));
+        var qty = Math.Max(1, quantity);
+        Profile.Sales.Add(new MenuSale(item.Name, item.Price, qty, buyer?.Trim() ?? string.Empty));
         Config.Save();
 
         var steps = item.ServeSteps.Where(s => !string.IsNullOrWhiteSpace(s.Command)).ToList();
@@ -119,7 +123,8 @@ public class MenuService
 
         var who = string.IsNullOrWhiteSpace(buyer) ? "" : $" to {buyer}";
         var extra = steps.Count > 0 ? $" ({steps.Count} step{(steps.Count == 1 ? "" : "s")} queued)" : "";
-        return (true, $"Served {item.Name}{who}.{extra}");
+        var qtyText = qty > 1 ? $" x{qty} ({item.Price * qty:N0} gil)" : "";
+        return (true, $"Served {item.Name}{qtyText}{who}.{extra}");
     }
 
     public void RemoveSale(MenuSale sale)
@@ -135,5 +140,7 @@ public class MenuService
     }
 
     public long TotalRevenue => Profile.Sales.Sum(s => s.Price);
+    // Number of orders placed (rows), and total items sold across them.
     public int TotalSales => Profile.Sales.Count;
+    public int TotalItemsSold => Profile.Sales.Sum(s => Math.Max(1, s.Quantity));
 }

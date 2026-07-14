@@ -10,6 +10,9 @@ public partial class MainWindow
 {
     private string newMenuItemName = string.Empty;
     private string menuServeBuyer = string.Empty;
+    // Per-item serve quantity (keyed by the item's index in the current menu),
+    // reset to 1 after each serve.
+    private readonly Dictionary<int, int> menuServeQty = new();
     private bool menuEditMode = false;
     private string newMenuProfileName = string.Empty;
     private string newMacroLabel = string.Empty;
@@ -89,7 +92,9 @@ public partial class MainWindow
             ImGui.AlignTextToFramePadding();
             ImGui.TextColored(Green, $"{Menu.TotalRevenue:N0} gil");
             ImGui.SameLine(0, 16);
-            WrapText(Grey, $"across {Menu.TotalSales} order{(Menu.TotalSales == 1 ? "" : "s")}");
+            WrapText(Grey, Menu.TotalItemsSold != Menu.TotalSales
+                ? $"across {Menu.TotalSales} order{(Menu.TotalSales == 1 ? "" : "s")} ({Menu.TotalItemsSold} items)"
+                : $"across {Menu.TotalSales} order{(Menu.TotalSales == 1 ? "" : "s")}");
         }
         ImGui.EndChild();
         ImGui.PopStyleColor();
@@ -170,22 +175,48 @@ public partial class MainWindow
                 ImGui.SameLine();
                 ImGui.TextColored(Green, $"  {item.Price:N0} gil");
 
+                // Quantity stepper + Serve button, right-aligned. Ordering 3 of
+                // an item logs ONE sale at 3x the price (sequence still runs once).
+                if (!menuServeQty.TryGetValue(i, out var qty) || qty < 1) qty = 1;
+
                 var serveLabel = "Serve";
-                var btnW = ImGui.CalcTextSize(serveLabel).X + ImGui.GetStyle().FramePadding.X * 2 + SW(8);
+                var qtyLabel = $"x{qty}";
+                var style = ImGui.GetStyle();
+                var btnW = ImGui.CalcTextSize(serveLabel).X + style.FramePadding.X * 2 + SW(8);
+                var stepW = ImGui.CalcTextSize("-").X + style.FramePadding.X * 2 + SW(6);
+                var qtyW = ImGui.CalcTextSize("x99").X + SW(8);
+                var groupW = stepW * 2 + qtyW + btnW + style.ItemSpacing.X * 3;
+
                 ImGui.SameLine();
                 var avail = ImGui.GetContentRegionAvail().X;
-                if (avail > btnW) ImGui.SetCursorPosX(ImGui.GetCursorPosX() + avail - btnW);
+                if (avail > groupW) ImGui.SetCursorPosX(ImGui.GetCursorPosX() + avail - groupW);
+
+                ImGui.PushID($"qty{i}");
+                if (ImGui.Button("-") && qty > 1) menuServeQty[i] = qty - 1;
+                ImGui.SameLine();
+                ImGui.AlignTextToFramePadding();
+                ImGui.TextColored(qty > 1 ? Gold : Grey, qtyLabel);
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("How many of this item they're buying. Serving logs one order at this quantity.");
+                ImGui.SameLine();
+                if (ImGui.Button("+") && qty < 99) menuServeQty[i] = qty + 1;
+                ImGui.PopID();
+
+                ImGui.SameLine();
                 ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.2f, 0.4f, 0.25f, 1f));
-                if (ImGui.Button(serveLabel))
+                if (ImGui.Button($"{serveLabel}##{i}"))
                 {
-                    var (ok, msg) = Menu.Serve(item, menuServeBuyer);
+                    var (ok, msg) = Menu.Serve(item, menuServeBuyer, qty);
                     SetStatus(msg, ok ? Green : Red);
+                    menuServeQty[i] = 1; // reset for the next customer
                 }
                 ImGui.PopStyleColor();
                 if (ImGui.IsItemHovered())
-                    ImGui.SetTooltip(hasSeq
-                        ? "Records the sale and performs this sequence for you:\n" + string.Join("\n", previewLines)
-                        : "Records this sale. (No serve sequence \u2014 add emotes in Edit to perform them automatically.)");
+                    ImGui.SetTooltip(
+                        (qty > 1 ? $"Serves {qty} \u2014 logs one order for {item.Price * qty:N0} gil.\n\n" : "")
+                        + (hasSeq
+                            ? "Records the sale and performs this sequence for you:\n" + string.Join("\n", previewLines)
+                            : "Records this sale. (No serve sequence \u2014 add emotes in Edit to perform them automatically.)"));
 
                 if (hasSeq)
                 {
@@ -250,7 +281,19 @@ public partial class MainWindow
                 ImGui.TableNextColumn();
                 ImGui.TextColored(Grey, s.When.ToString("h:mm tt"));
                 ImGui.TableNextColumn();
-                ImGui.TextUnformatted(s.ItemName);
+                var q = Math.Max(1, s.Quantity);
+                if (q > 1)
+                {
+                    ImGui.TextUnformatted(s.ItemName);
+                    ImGui.SameLine(0, SW(4));
+                    ImGui.TextColored(Gold, $"x{q}");
+                    if (ImGui.IsItemHovered())
+                        ImGui.SetTooltip($"{q} @ {s.UnitPrice:N0} gil each");
+                }
+                else
+                {
+                    ImGui.TextUnformatted(s.ItemName);
+                }
                 ImGui.TableNextColumn();
                 ImGui.TextColored(Green, $"{s.Price:N0}");
                 ImGui.TableNextColumn();

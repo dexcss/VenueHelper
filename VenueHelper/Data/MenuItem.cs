@@ -44,15 +44,33 @@ public class ServeStep
 public class MenuSale
 {
     public string ItemName = string.Empty;
+    // Price is the TOTAL for this sale (unit price x quantity). Kept as the
+    // total so existing saved sales (which had no quantity) stay correct.
     public long Price = 0;
     public string Buyer = string.Empty;    // optional
     public DateTime When = DateTime.Now;
+    // How many of the item were bought in this one order. Defaults to 1 so
+    // sales saved by older versions deserialize correctly.
+    public int Quantity = 1;
+
+    // Per-item price, derived from the total (guards against a 0/absent qty).
+    public long UnitPrice => Quantity > 1 ? Price / Quantity : Price;
 
     public MenuSale() { }
     public MenuSale(string itemName, long price, string buyer)
     {
         ItemName = itemName;
         Price = price;
+        Buyer = buyer;
+        When = DateTime.Now;
+        Quantity = 1;
+    }
+
+    public MenuSale(string itemName, long unitPrice, int quantity, string buyer)
+    {
+        ItemName = itemName;
+        Quantity = Math.Max(1, quantity);
+        Price = unitPrice * Quantity;
         Buyer = buyer;
         When = DateTime.Now;
     }
