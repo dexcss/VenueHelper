@@ -15,6 +15,9 @@ public unsafe class TradeWatcher
     private readonly Plugin Plugin;
 
     private bool WasOpen;
+    // Latched true once we've credited the current trade, so we never
+    // double-credit while the window stays open across multiple frames.
+    private bool CreditedThisTrade;
 
     private string SnapshotPartner = string.Empty;
     private uint SnapshotReceiveGil;
@@ -35,6 +38,7 @@ public unsafe class TradeWatcher
         {
             ResetSnapshot();
             WasOpen = false;
+            CreditedThisTrade = false;
             return;
         }
 
@@ -42,15 +46,36 @@ public unsafe class TradeWatcher
 
         if (isOpen)
         {
+            // A fresh open after a close resets the per-trade credit latch.
+            if (!WasOpen)
+                CreditedThisTrade = false;
+
             CaptureSnapshot();
             WasOpen = true;
+
+            // Credit as soon as BOTH parties are locked in and there's gil to
+            // credit \u2014 don't wait for the close edge. At low FPS a trade can open
+            // and close entirely between two Update() calls, so the close edge is
+            // unreliable; the "both locked + gil present" state is the moment the
+            // trade is actually agreed, and we latch it so we credit only once.
+            if (!CreditedThisTrade && SawBothLocked
+                && SnapshotReceiveGil > 0 && SnapshotPartner != string.Empty)
+            {
+                CreditTrade(SnapshotPartner, SnapshotReceiveGil);
+                CreditedThisTrade = true;
+            }
             return;
         }
 
-        if (WasOpen)
+        // Window is closed. If we opened but never managed to credit (e.g. we
+        // only ever caught frames before both locked), fall back to the close
+        // edge so a slow-frame trade still gets flagged/credited.
+        if (WasOpen && !CreditedThisTrade)
             OnTradeClosed();
 
         WasOpen = false;
+        CreditedThisTrade = false;
+        ResetSnapshot();
     }
 
     private void CaptureSnapshot()
@@ -66,8 +91,22 @@ public unsafe class TradeWatcher
 
         SnapshotReceiveGil = numbers->ReceiveGilCount;
 
-        if (numbers->SelfState == StateLockedIn && numbers->OtherState == StateLockedIn)
+        var bothLocked = numbers->SelfState == StateLockedIn && numbers->OtherState == StateLockedIn;
+        if (bothLocked)
+        {
             SawBothLocked = true;
+        }
+        else if (SawBothLocked)
+        {
+            // We were locked, now we're not: the previous trade finished (or was
+            // amended) and a new agreement is being set up within the same open
+            // window. Clear both the "locked" flag and the credit latch so the
+            // next lock-in is treated as a fresh trade and credited again. This
+            // catches back-to-back trades that never showed a closed window at
+            // low FPS.
+            SawBothLocked = false;
+            CreditedThisTrade = false;
+        }
     }
 
     private void OnTradeClosed()
