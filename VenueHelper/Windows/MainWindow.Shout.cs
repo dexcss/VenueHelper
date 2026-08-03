@@ -30,6 +30,26 @@ public partial class MainWindow
 
         ImGuiHelpers.ScaledDummy(8f);
 
+        // Box height selector (1-4 lines tall).
+        ImGui.TextColored(Grey, "Box height:");
+        ImGui.SameLine();
+        ImGui.SetNextItemWidth(SW(70));
+        var lines = Math.Clamp(Config.ShoutBoxLines, 1, 4);
+        if (ImGui.BeginCombo("##shoutlines", $"{lines} line{(lines == 1 ? "" : "s")}"))
+        {
+            for (var n = 1; n <= 4; n++)
+            {
+                if (ImGui.Selectable($"{n} line{(n == 1 ? "" : "s")}", n == lines))
+                {
+                    Config.ShoutBoxLines = n;
+                    Config.Save();
+                }
+            }
+            ImGui.EndCombo();
+        }
+
+        ImGuiHelpers.ScaledDummy(6f);
+
         int? removeAt = null;
         for (var i = 0; i < Config.ShoutPresets.Count; i++)
         {
@@ -53,13 +73,15 @@ public partial class MainWindow
                 ImGui.EndCombo();
             }
 
-            // Message box (fills remaining width, leaving room for Send + remove).
+            // Message box (multi-line, height follows the line-count setting).
             ImGui.SameLine();
             var msg = preset.Message;
             var sendWidth = ImGui.CalcTextSize("Send").X + ImGui.GetStyle().FramePadding.X * 2;
             var xWidth = ImGui.CalcTextSize(" X ").X + ImGui.GetStyle().FramePadding.X * 2;
-            ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - sendWidth - xWidth - SW(16));
-            if (ImGui.InputTextWithHint($"##msg{i}", "Type an announcement...", ref msg, 400))
+            var boxW = ImGui.GetContentRegionAvail().X - sendWidth - xWidth - SW(16);
+            var boxLines = Math.Clamp(Config.ShoutBoxLines, 1, 4);
+            var boxH = ImGui.GetTextLineHeight() * boxLines + ImGui.GetStyle().FramePadding.Y * 2;
+            if (ImGui.InputTextMultiline($"##msg{i}", ref msg, 400, new Vector2(boxW, boxH)))
             {
                 preset.Message = msg;
                 Config.Save();

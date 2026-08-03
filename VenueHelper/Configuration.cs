@@ -58,6 +58,15 @@ public class Configuration : IPluginConfiguration
     // ---- Shout/Yell Helper ---------------------------------------------
     // Preset announcement lines (channel + message) the host can fire quickly.
     public List<ShoutPreset> ShoutPresets = new();
+    // How many text lines tall each shout box is (1-4).
+    public int ShoutBoxLines = 2;
+    // Staff roster (persists across nights).
+    public List<Employee> Employees = new();
+    // Tab order + visibility. Empty = use default order with all shown. Each
+    // entry is a tab id (see MainWindow.TabIds); hidden tabs are listed in
+    // HiddenTabs. New tabs not present here are appended and shown by default.
+    public List<string> TabOrder = new();
+    public List<string> HiddenTabs = new();
 
     // ---- Bar Game Helper -----------------------------------------------
     public List<BarGame> BarGames = new();

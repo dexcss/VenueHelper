@@ -39,6 +39,7 @@ public sealed class Plugin : IDalamudPlugin
     public DeathrollManager Deathroll { get; init; }
     public BarGameService BarGames { get; init; }
     public MenuService Menu { get; init; }
+    public EmployeeService Employees { get; init; }
     public ActionScheduler Scheduler { get; init; }
     public TradeWatcher TradeWatcher { get; init; }
     public HookManager HookManager { get; init; }
@@ -66,6 +67,7 @@ public sealed class Plugin : IDalamudPlugin
         BarGames = new BarGameService(this);
         Scheduler = new ActionScheduler();
         Menu = new MenuService(this);
+        Employees = new EmployeeService(this);
         TradeWatcher = new TradeWatcher(this);
         HookManager = new HookManager(this);
 

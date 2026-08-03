@@ -150,6 +150,81 @@ public partial class MainWindow
             if (ImGui.Button("Cancel")) restoreConfirm = false;
         }
 
+        ImGuiHelpers.ScaledDummy(6f);
+        ImGui.Separator();
+        ImGuiHelpers.ScaledDummy(6f);
+
+        // ---- Tabs: show/hide + reorder --------------------------------
+        ImGui.TextColored(Gold, "Tabs");
+        WrapText(Grey, "Show or hide tabs and set their order. Settings always stays visible.");
+        ImGuiHelpers.ScaledDummy(4f);
+
+        var ordered = OrderedTabsForSettings();
+        for (var i = 0; i < ordered.Count; i++)
+        {
+            var t = ordered[i];
+            ImGui.PushID(t.Id);
+
+            // Up / down arrows.
+            if (ImGui.ArrowButton("##up", ImGuiDir.Up) && i > 0)
+                MoveTab(t.Id, -1);
+            ImGui.SameLine();
+            if (ImGui.ArrowButton("##down", ImGuiDir.Down) && i < ordered.Count - 1)
+                MoveTab(t.Id, +1);
+            ImGui.SameLine();
+
+            // Visible checkbox (Settings is locked on).
+            var visible = t.Id == "settings" || !Config.HiddenTabs.Contains(t.Id);
+            if (t.Id == "settings") ImGui.BeginDisabled();
+            if (ImGui.Checkbox($"##vis", ref visible))
+            {
+                if (visible) Config.HiddenTabs.Remove(t.Id);
+                else if (!Config.HiddenTabs.Contains(t.Id)) Config.HiddenTabs.Add(t.Id);
+                Config.Save();
+            }
+            if (t.Id == "settings") ImGui.EndDisabled();
+            ImGui.SameLine();
+            ImGui.TextColored(visible ? new Vector4(0.95f, 0.9f, 0.75f, 1f) : Grey, t.Label);
+
+            ImGui.PopID();
+        }
+        if (ImGui.SmallButton("Reset tab layout"))
+        {
+            Config.TabOrder.Clear();
+            Config.HiddenTabs.Clear();
+            Config.Save();
+        }
+
         DrawTabStatus("Settings");
+    }
+
+    // Full tab list in current saved order (including hidden), for the Settings
+    // editor.
+    private List<TabDef> OrderedTabsForSettings()
+    {
+        var all = AllTabs();
+        var byId = all.ToDictionary(t => t.Id);
+        var result = new List<TabDef>();
+        var used = new HashSet<string>();
+        foreach (var id in Config.TabOrder)
+            if (byId.TryGetValue(id, out var t) && used.Add(id))
+                result.Add(t);
+        foreach (var t in all)
+            if (used.Add(t.Id))
+                result.Add(t);
+        return result;
+    }
+
+    // Move a tab up (-1) or down (+1) in the saved order, materializing the
+    // current effective order into TabOrder first if needed.
+    private void MoveTab(string id, int dir)
+    {
+        var order = OrderedTabsForSettings().Select(t => t.Id).ToList();
+        var idx = order.IndexOf(id);
+        var target = idx + dir;
+        if (idx < 0 || target < 0 || target >= order.Count) return;
+        (order[idx], order[target]) = (order[target], order[idx]);
+        Config.TabOrder = order;
+        Config.Save();
     }
 }

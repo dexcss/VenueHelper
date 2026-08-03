@@ -213,6 +213,27 @@ public static class ExportData
             new[] { "When", "Mode", "Winner(s)", "Total Pot", "Contributors" }, rows);
     }
 
+    public static TableData Employees(IReadOnlyList<Data.Employee> employees, EmployeeService svc)
+    {
+        var rows = employees.Select(e =>
+        {
+            var worked = svc.WorkedSeconds(e);
+            var workedText = e.Mode == Data.PayMode.Hourly ? $"{worked / 3600}h {(worked % 3600) / 60}m" : "-";
+            var rate = e.Mode == Data.PayMode.Hourly ? $"{e.HourlyRate:N0}/hr" : $"{e.FlatRate:N0} flat";
+            return (IReadOnlyList<string>)new List<string>
+            {
+                e.Name,
+                e.Mode.ToString(),
+                rate,
+                workedText,
+                svc.AmountOwed(e).ToString("N0"),
+                e.Paid ? "PAID" : "unpaid",
+            };
+        }).ToList();
+        return new TableData("Employees",
+            new[] { "Name", "Mode", "Rate", "Worked", "Amount", "Status" }, rows);
+    }
+
     public static TableData GameHistory(string title, IReadOnlyList<Data.GameHistoryEntry> history)
     {
         var rows = history.Select(h => (IReadOnlyList<string>)new List<string>

@@ -50,54 +50,58 @@ public partial class MainWindow : Window, IDisposable
 
     public void Dispose() { }
 
+    // Tab registry: stable id -> (display label, draw action). Order here is the
+    // DEFAULT order for anyone who hasn't customized it.
+    private readonly record struct TabDef(string Id, string Label, Action Draw);
+
+    private List<TabDef> AllTabs() => new()
+    {
+        new("counter",  "Venue Counter",     DrawCounterTab),
+        new("raffle",   "Raffle Helper",     DrawRaffleTab),
+        new("auction",  "Auction Helper",    DrawAuctionTab),
+        new("giveaway", "Giveaway Helper",   DrawGiveawayTab),
+        new("deathroll","DR Tourny Helper",  DrawDeathrollTab),
+        new("shout",    "Shout/Yell Helper", DrawShoutTab),
+        new("bargame",  "Bar Game Helper",   DrawBarGameTab),
+        new("menu",     "Menu Helper",       DrawMenuTab),
+        new("employees","Employees",         DrawEmployeesTab),
+        new("settings", "Settings",          DrawSettingsTab),
+    };
+
+    // Resolve the ordered, visible tab list from config. Unknown/new tabs are
+    // appended in default order. Settings can never be hidden.
+    private List<TabDef> OrderedVisibleTabs()
+    {
+        var all = AllTabs();
+        var byId = all.ToDictionary(t => t.Id);
+        var result = new List<TabDef>();
+        var used = new HashSet<string>();
+
+        foreach (var id in Config.TabOrder)
+        {
+            if (byId.TryGetValue(id, out var t) && used.Add(id))
+                result.Add(t);
+        }
+        // Append any tabs not in the saved order (e.g. newly added ones).
+        foreach (var t in all)
+            if (used.Add(t.Id))
+                result.Add(t);
+
+        // Filter hidden (but never hide Settings).
+        return result.Where(t => t.Id == "settings" || !Config.HiddenTabs.Contains(t.Id)).ToList();
+    }
+
     public override void Draw()
     {
         if (ImGui.BeginTabBar("##venuehelper_tabs"))
         {
-            if (ImGui.BeginTabItem("Venue Counter"))
+            foreach (var tab in OrderedVisibleTabs())
             {
-                DrawCounterTab();
-                ImGui.EndTabItem();
-            }
-            if (ImGui.BeginTabItem("Raffle Helper"))
-            {
-                DrawRaffleTab();
-                ImGui.EndTabItem();
-            }
-            if (ImGui.BeginTabItem("Auction Helper"))
-            {
-                DrawAuctionTab();
-                ImGui.EndTabItem();
-            }
-            if (ImGui.BeginTabItem("Giveaway Helper"))
-            {
-                DrawGiveawayTab();
-                ImGui.EndTabItem();
-            }
-            if (ImGui.BeginTabItem("DR Tourny Helper"))
-            {
-                DrawDeathrollTab();
-                ImGui.EndTabItem();
-            }
-            if (ImGui.BeginTabItem("Shout/Yell Helper"))
-            {
-                DrawShoutTab();
-                ImGui.EndTabItem();
-            }
-            if (ImGui.BeginTabItem("Bar Game Helper"))
-            {
-                DrawBarGameTab();
-                ImGui.EndTabItem();
-            }
-            if (ImGui.BeginTabItem("Menu Helper"))
-            {
-                DrawMenuTab();
-                ImGui.EndTabItem();
-            }
-            if (ImGui.BeginTabItem("Settings"))
-            {
-                DrawSettingsTab();
-                ImGui.EndTabItem();
+                if (ImGui.BeginTabItem(tab.Label))
+                {
+                    tab.Draw();
+                    ImGui.EndTabItem();
+                }
             }
             ImGui.EndTabBar();
         }
