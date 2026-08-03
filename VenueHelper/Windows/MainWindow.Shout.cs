@@ -81,7 +81,10 @@ public partial class MainWindow
             var boxW = ImGui.GetContentRegionAvail().X - sendWidth - xWidth - SW(16);
             var boxLines = Math.Clamp(Config.ShoutBoxLines, 1, 4);
             var boxH = ImGui.GetTextLineHeight() * boxLines + ImGui.GetStyle().FramePadding.Y * 2;
-            if (ImGui.InputTextMultiline($"##msg{i}", ref msg, 400, new Vector2(boxW, boxH)))
+            // NoHorizontalScroll keeps long text from running off to the right;
+            // in this binding it should wrap down to the next visible line.
+            if (ImGui.InputTextMultiline($"##msg{i}", ref msg, 400, new Vector2(boxW, boxH),
+                    ImGuiInputTextFlags.NoHorizontalScroll))
             {
                 preset.Message = msg;
                 Config.Save();
