@@ -15,6 +15,11 @@ public class MenuService
     public List<MenuMacro> Macros => Profile.Macros;
     public List<MenuSale> Sales => Profile.Sales;
 
+    // Default wait (seconds) for newly added serve/macro steps, from the
+    // Settings tab. v1.5.1.0: this setting previously existed but was never
+    // read; it is now the delay pre-filled on every new step.
+    public float DefaultStepDelaySec => Math.Max(0, Config.MenuServeStepDelayMs) / 1000f;
+
     // ---- Profiles ------------------------------------------------------
     public List<MenuProfile> Profiles => Config.MenuProfiles;
 
@@ -48,8 +53,9 @@ public class MenuService
     {
         var item = new MenuItem(string.IsNullOrWhiteSpace(name) ? "New Item" : name.Trim());
         // Start with one empty serve step so the sequence is visible and ready to
-        // fill in (mirrors how Additional Macros start).
-        item.ServeSteps.Add(new ServeStep(string.Empty, 1.0f));
+        // fill in (mirrors how Additional Macros start). The wait defaults to the
+        // Settings-tab step delay.
+        item.ServeSteps.Add(new ServeStep(string.Empty, DefaultStepDelaySec));
         Profile.Items.Add(item);
         Config.Save();
         return item;

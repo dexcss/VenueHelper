@@ -94,12 +94,12 @@ public partial class MainWindow
 
         const ImGuiTableFlags flags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg
                                       | ImGuiTableFlags.ScrollY | ImGuiTableFlags.SizingStretchProp;
-        if (ImGui.BeginTable("##drplayers", 3, flags, new Vector2(0, 240)))
+        if (ImGui.BeginTable("##drplayers", 3, flags, new Vector2(0, SW(240))))
         {
             ImGui.TableSetupScrollFreeze(0, 1);
             ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.WidthStretch, 1.8f);
             ImGui.TableSetupColumn("World", ImGuiTableColumnFlags.WidthStretch, 1.0f);
-            ImGui.TableSetupColumn("##del", ImGuiTableColumnFlags.WidthFixed, 60);
+            ImGui.TableSetupColumn("##del", ImGuiTableColumnFlags.WidthFixed, SW(60));
             ImGui.TableHeadersRow();
 
             DeathrollPlayer? remove = null;
@@ -130,16 +130,10 @@ public partial class MainWindow
         }
         ImGui.PopStyleColor();
         ImGui.SameLine();
-        if (ImGui.Button("Clear All"))
-            ImGui.OpenPopup("##drclear");
-        if (ImGui.BeginPopup("##drclear"))
-        {
-            ImGui.TextColored(Red, "Are you sure? Remove all players?");
-            if (ImGui.Button("Yes, clear")) { Dr.ClearAll(); SetStatus("Cleared.", Red); ImGui.CloseCurrentPopup(); }
-            ImGui.SameLine();
-            if (ImGui.Button("Cancel")) ImGui.CloseCurrentPopup();
-            ImGui.EndPopup();
-        }
+        DestructiveButton("Clear All", "##drclear",
+            "Are you sure? Remove all players?",
+            () => { Dr.ClearAll(); SetStatus("Cleared.", Red); },
+            "Yes, clear");
     }
 
     private void DrawDeathrollBracket()
@@ -164,7 +158,9 @@ public partial class MainWindow
             WrapText(Red, champ != null
                 ? "Reset the bracket? The champion is saved to History first, then the bracket and players are cleared."
                 : "Are you sure? This clears the bracket and all players. (Only completed tournaments are archived.)");
+            ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.6f, 0.1f, 0.1f, 1f));
             if (ImGui.Button("Yes, reset")) { Dr.ClearAll(); SetStatus(champ != null ? "Tournament archived and bracket reset." : "Bracket reset.", Green); ImGui.CloseCurrentPopup(); }
+            ImGui.PopStyleColor();
             ImGui.SameLine();
             if (ImGui.Button("Cancel")) ImGui.CloseCurrentPopup();
             ImGui.EndPopup();
@@ -194,9 +190,9 @@ public partial class MainWindow
 
         // Bracket laid out round by round in side-by-side bordered columns.
         var rounds = Dr.TotalRounds;
-        if (ImGui.BeginChild("##bracketscroll", new Vector2(0, 380), false, ImGuiWindowFlags.HorizontalScrollbar))
+        if (ImGui.BeginChild("##bracketscroll", new Vector2(0, SW(380)), false, ImGuiWindowFlags.HorizontalScrollbar))
         {
-            const float colWidth = 200f;
+            var colWidth = SW(200f);
             for (var r = 1; r <= rounds; r++)
             {
                 var matches = Dr.RoundMatches(r).ToList();
@@ -329,7 +325,7 @@ public partial class MainWindow
 
         // Live roll log (rejected rolls shown greyed with a reason).
         const ImGuiTableFlags flags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY;
-        if (ImGui.BeginTable("##drrolls", 4, flags, new Vector2(0, 140)))
+        if (ImGui.BeginTable("##drrolls", 4, flags, new Vector2(0, SW(140))))
         {
             ImGui.TableSetupColumn("Player");
             ImGui.TableSetupColumn("Rolled");

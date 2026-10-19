@@ -127,13 +127,10 @@ public partial class MainWindow
 
                 if (e.Mode == PayMode.Hourly)
                 {
-                    ImGui.SetNextItemWidth(SW(120));
-                    var rateText = e.HourlyRate == 0 ? string.Empty : e.HourlyRate.ToString();
-                    if (ImGui.InputTextWithHint("##hrate", "gil/hour", ref rateText, 24))
-                    {
-                        if (GilFormat.TryParse(rateText, out var r)) { e.HourlyRate = Math.Max(0, r); Config.Save(); }
-                        else if (string.IsNullOrWhiteSpace(rateText)) { e.HourlyRate = 0; Config.Save(); }
-                    }
+                    // v1.5.1.0: raw-text buffer (keyed per employee) so typing
+                    // "500k" doesn't snap the box mid-keystroke.
+                    GilInput($"##hrate{e.Id}", "gil/hour", e.HourlyRate,
+                        v => { e.HourlyRate = Math.Max(0, v); Config.Save(); }, 120);
                     ImGui.SameLine();
 
                     // Clock in/out + worked time.
@@ -151,13 +148,8 @@ public partial class MainWindow
                 }
                 else
                 {
-                    ImGui.SetNextItemWidth(SW(140));
-                    var flatText = e.FlatRate == 0 ? string.Empty : e.FlatRate.ToString();
-                    if (ImGui.InputTextWithHint("##frate", "flat gil (e.g. 500k)", ref flatText, 24))
-                    {
-                        if (GilFormat.TryParse(flatText, out var r)) { e.FlatRate = Math.Max(0, r); Config.Save(); }
-                        else if (string.IsNullOrWhiteSpace(flatText)) { e.FlatRate = 0; Config.Save(); }
-                    }
+                    GilInput($"##frate{e.Id}", "flat gil (e.g. 500k)", e.FlatRate,
+                        v => { e.FlatRate = Math.Max(0, v); Config.Save(); }, 140);
                 }
 
                 ImGui.SameLine();

@@ -64,21 +64,10 @@ public partial class MainWindow
         if (Menu.Profiles.Count > 1)
         {
             ImGui.SameLine();
-            ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.45f, 0.15f, 0.15f, 1f));
-            if (ImGui.SmallButton("Delete menu")) ImGui.OpenPopup("##delmenuprofile");
-            ImGui.PopStyleColor();
-            if (ImGui.BeginPopup("##delmenuprofile"))
-            {
-                WrapText(Red, $"Delete the menu \"{Menu.Profile.Name}\" and its items/macros?");
-                if (ImGui.Button("Yes, delete"))
-                {
-                    Menu.RemoveProfile(Menu.Profile);
-                    ImGui.CloseCurrentPopup();
-                }
-                ImGui.SameLine();
-                if (ImGui.Button("Cancel")) ImGui.CloseCurrentPopup();
-                ImGui.EndPopup();
-            }
+            DestructiveButton("Delete menu", "##delmenuprofile",
+                $"Delete the menu \"{Menu.Profile.Name}\" and its items/macros?",
+                () => Menu.RemoveProfile(Menu.Profile),
+                "Yes, delete");
         }
 
         ImGuiHelpers.ScaledDummy(4f);
@@ -243,21 +232,10 @@ public partial class MainWindow
 
         ImGui.TextColored(new Vector4(0.95f, 0.85f, 0.5f, 1f), "Orders tonight");
         ImGui.SameLine(0, 16);
-        if (ImGui.SmallButton("Clear orders"))
-            ImGui.OpenPopup("##clearsales");
-        if (ImGui.BeginPopup("##clearsales"))
-        {
-            ImGui.TextColored(Red, "Clear all of tonight's orders?");
-            if (ImGui.Button("Yes, clear"))
-            {
-                Menu.ClearSales();
-                SetStatus("Orders cleared.", Grey);
-                ImGui.CloseCurrentPopup();
-            }
-            ImGui.SameLine();
-            if (ImGui.Button("Cancel")) ImGui.CloseCurrentPopup();
-            ImGui.EndPopup();
-        }
+        DestructiveButton("Clear orders", "##clearsales",
+            "Clear all of tonight's orders?",
+            () => { Menu.ClearSales(); SetStatus("Orders cleared.", Grey); },
+            "Yes, clear");
 
         const ImGuiTableFlags flags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg
                                       | ImGuiTableFlags.ScrollY | ImGuiTableFlags.SizingStretchProp;
@@ -405,9 +383,9 @@ public partial class MainWindow
                 if (stepRemove != null) { item.ServeSteps.RemoveAt(stepRemove.Value); Menu.Save(); }
                 ImGui.PopStyleVar(2);
 
-                if (ImGui.SmallButton("+ Add step")) { item.ServeSteps.Add(new ServeStep(string.Empty, 1.0f)); Menu.Save(); }
+                if (ImGui.SmallButton("+ Add step")) { item.ServeSteps.Add(new ServeStep(string.Empty, Menu.DefaultStepDelaySec)); Menu.Save(); }
                 ImGui.SameLine(0, 16);
-                if (ImGui.SmallButton("+ Add /trade step")) { item.ServeSteps.Add(new ServeStep("/trade", 2.0f)); Menu.Save(); }
+                if (ImGui.SmallButton("+ Add /trade step")) { item.ServeSteps.Add(new ServeStep("/trade", Menu.DefaultStepDelaySec)); Menu.Save(); }
                 if (ImGui.IsItemHovered()) ImGui.SetTooltip("Opens a trade with your current target when this step runs.");
 
                 ImGui.SameLine(0, 24);
@@ -494,11 +472,22 @@ public partial class MainWindow
             ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.45f, 0.15f, 0.15f, 1f));
             if (ImGui.SmallButton("Clear all macros"))
             {
-                clearMacrosConfirm = false;
-                ImGui.OpenPopup("##clearmacros");
+                // v1.5.1.0: honors the Settings confirm toggle; the double-stage
+                // popup is skipped entirely when confirms are off.
+                if (!Config.ConfirmDestructive)
+                {
+                    Menu.Macros.Clear();
+                    Menu.Save();
+                    SetStatus("All macros cleared.", Red);
+                }
+                else
+                {
+                    clearMacrosConfirm = false;
+                    ImGui.OpenPopup("##clearmacros");
+                }
             }
             ImGui.PopStyleColor();
-            if (ImGui.BeginPopup("##clearmacros"))
+            if (Config.ConfirmDestructive && ImGui.BeginPopup("##clearmacros"))
             {
                 if (!clearMacrosConfirm)
                 {
@@ -601,7 +590,7 @@ public partial class MainWindow
             if (!string.IsNullOrWhiteSpace(newMacroLabel))
             {
                 var m = Menu.AddMacro(newMacroLabel);
-                m.Steps.Add(new ServeStep(string.Empty, 1.0f));
+                m.Steps.Add(new ServeStep(string.Empty, Menu.DefaultStepDelaySec));
                 Menu.Save();
                 newMacroLabel = string.Empty;
             }

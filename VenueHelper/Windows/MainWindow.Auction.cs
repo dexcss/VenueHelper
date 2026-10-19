@@ -40,6 +40,7 @@ public partial class MainWindow
         {
             houseCutInput = (float)Math.Round(Math.Clamp(houseCutInput, 0f, 100f));
             Auction.SetHouseCut(houseCutInput);
+            houseCutInput = Auction.HouseCutPercent; // resync the box to the stored value
         }
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Percentage the house keeps from each sale. Captured per-sale when you finalize.");
@@ -137,23 +138,10 @@ public partial class MainWindow
             if (avail > w)
                 ImGui.SetCursorPosX(ImGui.GetCursorPosX() + avail - w);
         }
-        ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.45f, 0.15f, 0.15f, 1f));
-        if (ImGui.Button("Reset Active List"))
-            ImGui.OpenPopup("##resetactive");
-        ImGui.PopStyleColor();
-        if (ImGui.BeginPopup("##resetactive"))
-        {
-            ImGui.TextColored(Red, "Are you sure? Clear everyone currently on the block?");
-            if (ImGui.Button("Yes, clear"))
-            {
-                Auction.ClearActive();
-                SetStatus("Active auction list cleared.", Red);
-                ImGui.CloseCurrentPopup();
-            }
-            ImGui.SameLine();
-            if (ImGui.Button("Cancel")) ImGui.CloseCurrentPopup();
-            ImGui.EndPopup();
-        }
+        DestructiveButton("Reset Active List", "##resetactive",
+            "Are you sure? Clear everyone currently on the block?",
+            () => { Auction.ClearActive(); SetStatus("Active auction list cleared.", Red); },
+            "Yes, clear");
 
         ImGuiHelpers.ScaledDummy(6f);
         ImGui.TextColored(Blue, $"On the block now: {Auction.Active.Count}");
@@ -161,7 +149,7 @@ public partial class MainWindow
         const ImGuiTableFlags flags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg
                                       | ImGuiTableFlags.ScrollY | ImGuiTableFlags.SizingStretchProp;
 
-        if (ImGui.BeginTable("##auctionactive", 6, flags, new Vector2(0, 320)))
+        if (ImGui.BeginTable("##auctionactive", 6, flags, new Vector2(0, SW(320))))
         {
             ImGui.TableSetupScrollFreeze(0, 1);
             ImGui.TableSetupColumn("Player", ImGuiTableColumnFlags.WidthStretch, 1.4f);
@@ -289,6 +277,7 @@ public partial class MainWindow
         ImGui.InputTextWithHint("##histto", "to", ref histTo, 10);
         ImGui.SameLine();
         if (ImGui.SmallButton("Clear filter")) { histFrom = string.Empty; histTo = string.Empty; }
+        ImGui.SameLine();
         if (ImGui.SmallButton("Today"))
         {
             histFrom = DateTime.Now.ToString("yyyy-MM-dd");
@@ -325,23 +314,10 @@ public partial class MainWindow
         ImGui.SetNextItemWidth(SW(220));
         ImGui.InputTextWithHint("##ahsearch", "Search name, note or winner", ref auctionHistorySearch, 64);
         ImGui.SameLine();
-        ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.45f, 0.15f, 0.15f, 1f));
-        if (ImGui.Button("Clear History"))
-            ImGui.OpenPopup("##clearauctionhistory");
-        ImGui.PopStyleColor();
-        if (ImGui.BeginPopup("##clearauctionhistory"))
-        {
-            ImGui.TextColored(Red, "Are you sure? Permanently clear all auction history?");
-            if (ImGui.Button("Yes, clear"))
-            {
-                Auction.ClearHistory();
-                SetStatus("Auction history cleared.", Red);
-                ImGui.CloseCurrentPopup();
-            }
-            ImGui.SameLine();
-            if (ImGui.Button("Cancel")) ImGui.CloseCurrentPopup();
-            ImGui.EndPopup();
-        }
+        DestructiveButton("Clear History", "##clearauctionhistory",
+            "Are you sure? Permanently clear all auction history?",
+            () => { Auction.ClearHistory(); SetStatus("Auction history cleared.", Red); },
+            "Yes, clear");
         ImGui.TextColored(Grey, "Use the Export button (top right) to save history.");
 
         ImGuiHelpers.ScaledDummy(4f);
@@ -349,7 +325,7 @@ public partial class MainWindow
         const ImGuiTableFlags flags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg
                                       | ImGuiTableFlags.ScrollY | ImGuiTableFlags.SizingStretchProp;
 
-        if (ImGui.BeginTable("##auctionhistory", 9, flags, new Vector2(0, 300)))
+        if (ImGui.BeginTable("##auctionhistory", 9, flags, new Vector2(0, SW(300))))
         {
             ImGui.TableSetupScrollFreeze(0, 1);
             ImGui.TableSetupColumn("Time", ImGuiTableColumnFlags.WidthFixed, SW(110));

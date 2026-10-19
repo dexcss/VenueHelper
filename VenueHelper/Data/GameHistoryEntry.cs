@@ -11,5 +11,6 @@ public class GameHistoryEntry
     public long Pot = 0;                    // pot/total gil, 0 if not applicable
     public string Details = string.Empty;   // extra context (runner-up, ticket count, etc.)
 
+    [Newtonsoft.Json.JsonIgnore]
     public string PotShort => Pot > 0 ? Logic.GilFormat.Short(Pot) : "-";
 }

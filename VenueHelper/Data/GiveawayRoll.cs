@@ -19,6 +19,7 @@ public class GiveawayRoll
     public bool Invalid;
     public string InvalidReason = string.Empty;
 
+    [Newtonsoft.Json.JsonIgnore]
     public string NameOnly
     {
         get
@@ -28,6 +29,7 @@ public class GiveawayRoll
         }
     }
 
+    [Newtonsoft.Json.JsonIgnore]
     public string DisplayName => FullName.Replace('\uE05D', '@');
 }
 

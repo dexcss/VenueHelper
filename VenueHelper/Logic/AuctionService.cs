@@ -163,9 +163,10 @@ public class AuctionService
     {
         if (string.IsNullOrWhiteSpace(winner)) return false;
         var w = winner.Trim();
+        // Exact match only (v1.5.1.0: was a loose bidirectional Contains, which
+        // could count a DIFFERENT player whose name merely contained an alias,
+        // e.g. alias "Ann" matching the winner "Annette").
         if (b.DisplayName.Equals(w, StringComparison.OrdinalIgnoreCase)) return true;
-        return b.Aliases.Any(a =>
-            w.Equals(a, StringComparison.OrdinalIgnoreCase) ||
-            w.Contains(a, StringComparison.OrdinalIgnoreCase));
+        return b.Aliases.Any(a => a.Trim().Equals(w, StringComparison.OrdinalIgnoreCase));
     }
 }

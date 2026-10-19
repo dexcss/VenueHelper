@@ -75,17 +75,8 @@ public partial class MainWindow
                 // Open / delete controls under the card.
                 if (ImGui.SmallButton("Open")) { openBarGame = game; barEditMode = false; }
                 ImGui.SameLine();
-                ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.45f, 0.15f, 0.15f, 1f));
-                if (ImGui.SmallButton("Delete")) ImGui.OpenPopup("##delgame");
-                ImGui.PopStyleColor();
-                if (ImGui.BeginPopup("##delgame"))
-                {
-                    ImGui.TextColored(Red, $"Delete \"{game.Name}\"?");
-                    if (ImGui.Button("Yes, delete")) { toDelete = game; ImGui.CloseCurrentPopup(); }
-                    ImGui.SameLine();
-                    if (ImGui.Button("Cancel")) ImGui.CloseCurrentPopup();
-                    ImGui.EndPopup();
-                }
+                DestructiveButton("Delete", "##delgame", $"Delete \"{game.Name}\"?",
+                    () => toDelete = game, "Yes, delete");
 
                 ImGuiHelpers.ScaledDummy(4f);
                 ImGui.PopID();
@@ -251,21 +242,10 @@ public partial class MainWindow
             ImGui.PopStyleColor();
         }
         ImGui.SameLine();
-        if (ImGui.Button("Clear rolls"))
-            ImGui.OpenPopup("##barclearrolls");
-        if (ImGui.BeginPopup("##barclearrolls"))
-        {
-            WrapText(Red, "Clear this round? The winner and pot are saved to History first, then the rolls/players are cleared.");
-            if (ImGui.Button("Yes, clear"))
-            {
-                Bar.ClearPlays(g);
-                SetStatus("Round archived to history and cleared.", Green);
-                ImGui.CloseCurrentPopup();
-            }
-            ImGui.SameLine();
-            if (ImGui.Button("Cancel")) ImGui.CloseCurrentPopup();
-            ImGui.EndPopup();
-        }
+        DestructiveButton("Clear rolls", "##barclearrolls",
+            "Clear this round? The winner and pot are saved to History first, then the rolls/players are cleared.",
+            () => { Bar.ClearPlays(g); SetStatus("Round archived to history and cleared.", Green); },
+            "Yes, clear");
         ImGui.SameLine();
         if (ImGui.Button(showBarHistory ? "Hide history" : $"History ({Bar.BarHistory.Count})"))
             showBarHistory = !showBarHistory;
@@ -458,24 +438,28 @@ public partial class MainWindow
             // hit/miss coloring, instead of one row per roll.
             if (ImGui.BeginChild("##barsurvlist", new Vector2(0, SW(220)), true))
             {
-                // Group plays by player, preserving roll order.
-                var byPlayer = new List<(string name, List<BarGamePlay> rolls)>();
+                // Group plays by player, preserving roll order. v1.5.1.0: this
+                // was a FirstOrDefault scan per play (O(n^2) with the list
+                // rebuilt every frame); a dictionary keeps it linear.
+                var byOrder = new List<string>();
+                var rollsByName = new Dictionary<string, List<BarGamePlay>>();
                 foreach (var play in g.Plays)
                 {
-                    var entry = byPlayer.FirstOrDefault(e => e.name == play.NameOnly);
-                    if (entry.rolls == null)
+                    if (!rollsByName.TryGetValue(play.NameOnly, out var list))
                     {
-                        entry = (play.NameOnly, new List<BarGamePlay>());
-                        byPlayer.Add(entry);
+                        list = new List<BarGamePlay>();
+                        rollsByName[play.NameOnly] = list;
+                        byOrder.Add(play.NameOnly);
                     }
-                    entry.rolls.Add(play);
+                    list.Add(play);
                 }
 
-                if (byPlayer.Count == 0)
+                if (byOrder.Count == 0)
                     ImGui.TextColored(Grey, "No rolls yet.");
 
-                foreach (var (name, rolls) in byPlayer)
+                foreach (var name in byOrder)
                 {
+                    var rolls = rollsByName[name];
                     ImGui.TextColored(new Vector4(0.95f, 0.9f, 0.75f, 1f), $"{name}:");
                     var avail = ImGui.GetContentRegionAvail().X;
                     var spacing = ImGui.GetStyle().ItemSpacing.X;
@@ -792,13 +776,10 @@ public partial class MainWindow
                     ImGui.SetNextItemWidth(SW(70));
                     if (ImGui.InputInt("##high", ref th, 0, 0)) { t.High = th; Config.Save(); }
                     ImGui.SameLine(); ImGui.TextUnformatted("wins"); ImGui.SameLine();
-                    var amtText = t.Amount == 0 ? string.Empty : t.Amount.ToString();
-                    ImGui.SetNextItemWidth(SW(120));
-                    if (ImGui.InputTextWithHint("##amt", "gil (200k)", ref amtText, 24))
-                    {
-                        if (GilFormat.TryParse(amtText, out var parsed)) { t.Amount = Math.Max(0, parsed); Config.Save(); }
-                        else if (string.IsNullOrWhiteSpace(amtText)) { t.Amount = 0; Config.Save(); }
-                    }
+                    // v1.5.1.0: raw-text buffer so the box doesn't rewrite itself
+                    // mid-typing (keyed per tier row).
+                    GilInput($"##amt{ti}", "gil (200k)", t.Amount,
+                        v => { t.Amount = Math.Max(0, v); Config.Save(); }, 120);
                     ImGui.SameLine();
                     if (ImGui.SmallButton("x")) removeTier = t;
                     ImGui.PopID();
@@ -815,21 +796,12 @@ public partial class MainWindow
                     ImGui.SetNextItemWidth(SW(90));
                     if (ImGui.InputInt("Jackpot number", ref jn, 0, 0)) { g.JackpotNumber = jn; Config.Save(); }
 
-                    var startText = g.JackpotStart == 0 ? string.Empty : g.JackpotStart.ToString();
-                    ImGui.SetNextItemWidth(SW(130));
-                    if (ImGui.InputTextWithHint("Starting jackpot", "e.g. 5M", ref startText, 24))
-                    {
-                        if (GilFormat.TryParse(startText, out var js)) { g.JackpotStart = Math.Max(0, js); Config.Save(); }
-                        else if (string.IsNullOrWhiteSpace(startText)) { g.JackpotStart = 0; Config.Save(); }
-                    }
+                    // v1.5.1.0: raw-text buffers (typing "5M" used to snap the box).
+                    GilInput("Starting jackpot", "e.g. 5M", g.JackpotStart,
+                        v => { g.JackpotStart = Math.Max(0, v); Config.Save(); }, 130);
 
-                    var perText = g.JackpotPerBuyIn == 0 ? string.Empty : g.JackpotPerBuyIn.ToString();
-                    ImGui.SetNextItemWidth(SW(130));
-                    if (ImGui.InputTextWithHint("Grows per buy-in", "e.g. 100k", ref perText, 24))
-                    {
-                        if (GilFormat.TryParse(perText, out var jp)) { g.JackpotPerBuyIn = Math.Max(0, jp); Config.Save(); }
-                        else if (string.IsNullOrWhiteSpace(perText)) { g.JackpotPerBuyIn = 0; Config.Save(); }
-                    }
+                    GilInput("Grows per buy-in", "e.g. 100k", g.JackpotPerBuyIn,
+                        v => { g.JackpotPerBuyIn = Math.Max(0, v); Config.Save(); }, 130);
                     WrapText(Grey, $"Current jackpot: {GilFormat.Short(g.JackpotStarted ? g.CurrentJackpot : g.JackpotStart)}. It seeds at the starting amount, grows each buy-in, and resets after someone hits {g.JackpotNumber}.");
                 }
                 break;

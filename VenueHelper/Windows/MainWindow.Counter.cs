@@ -76,23 +76,10 @@ public partial class MainWindow
         if (Counter.Venues.Count > 1)
         {
             ImGui.SameLine();
-            ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.45f, 0.15f, 0.15f, 1f));
-            if (ImGui.SmallButton("Remove venue"))
-                ImGui.OpenPopup("##removevenue");
-            ImGui.PopStyleColor();
-            if (ImGui.BeginPopup("##removevenue"))
-            {
-                WrapText(Red, $"Remove \"{Counter.ActiveVenueName}\" and all its records?");
-                if (ImGui.Button("Yes, remove"))
-                {
-                    Counter.RemoveVenue(Plugin.Configuration.ActiveVenueProfile);
-                    SetStatus("Venue removed.", Red);
-                    ImGui.CloseCurrentPopup();
-                }
-                ImGui.SameLine();
-                if (ImGui.Button("Cancel")) ImGui.CloseCurrentPopup();
-                ImGui.EndPopup();
-            }
+            DestructiveButton("Remove venue", "##removevenue",
+                $"Remove \"{Counter.ActiveVenueName}\" and all its records?",
+                () => { Counter.RemoveVenue(Plugin.Configuration.ActiveVenueProfile); SetStatus("Venue removed.", Red); },
+                "Yes, remove");
         }
 
         ImGuiHelpers.ScaledDummy(4f);
@@ -192,23 +179,10 @@ public partial class MainWindow
             }
         }
         ImGui.SameLine();
-        if (ImGui.Button("Reset##allnight"))
-            ImGui.OpenPopup("##resetallnight");
-
-        if (ImGui.BeginPopup("##resetallnight"))
-        {
-            ImGui.TextColored(Red, "Reset the all-night total to 0?");
-            if (ImGui.Button("Yes, reset"))
-            {
-                Counter.ResetAllNight();
-                SetStatus("All-night counter reset.", Red);
-                ImGui.CloseCurrentPopup();
-            }
-            ImGui.SameLine();
-            if (ImGui.Button("Cancel"))
-                ImGui.CloseCurrentPopup();
-            ImGui.EndPopup();
-        }
+        DestructiveButton("Reset##allnight", "##resetallnight",
+            "Reset the all-night total to 0?",
+            () => { Counter.ResetAllNight(); SetStatus("All-night counter reset.", Red); },
+            "Yes, reset");
 
         ImGuiHelpers.ScaledDummy(6f);
         WrapText(Grey, "Tip: both counters run off the same scan, so you can run a lap while the all-night total keeps going. Use the Export button (top right) to save the visitor list.");
@@ -237,12 +211,22 @@ public partial class MainWindow
         ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.45f, 0.15f, 0.15f, 1f));
         if (ImGui.Button("Reset Times"))
         {
-            ImGui.OpenPopup("##resettimes");
-            resetTimesConfirm = false;
-            resetTimesConfirm2 = false;
+            // v1.5.1.0: honors the Settings confirm toggle; when confirms are
+            // off this wipes immediately.
+            if (!Config.ConfirmDestructive)
+            {
+                Counter.ResetVisitTimes();
+                SetStatus("Visit times cleared.", Red);
+            }
+            else
+            {
+                ImGui.OpenPopup("##resettimes");
+                resetTimesConfirm = false;
+                resetTimesConfirm2 = false;
+            }
         }
         ImGui.PopStyleColor();
-        if (ImGui.BeginPopup("##resettimes"))
+        if (Config.ConfirmDestructive && ImGui.BeginPopup("##resettimes"))
         {
             ImGui.TextColored(Red, "Clear ALL lifetime visit times for this venue?");
             ImGui.TextColored(Grey, "This wipes the whole time database and can't be undone.");
@@ -299,7 +283,7 @@ public partial class MainWindow
 
         const ImGuiTableFlags tflags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg
                                       | ImGuiTableFlags.ScrollY | ImGuiTableFlags.SizingStretchProp;
-        if (ImGui.BeginTable("##visittimes", 4, tflags, new Vector2(0, 240)))
+        if (ImGui.BeginTable("##visittimes", 4, tflags, new Vector2(0, SW(240))))
         {
             ImGui.TableSetupScrollFreeze(0, 1);
             ImGui.TableSetupColumn("Player", ImGuiTableColumnFlags.WidthStretch, 1.8f);

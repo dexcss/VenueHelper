@@ -22,5 +22,6 @@ public class VisitSession
         Open = true;
     }
 
+    [Newtonsoft.Json.JsonIgnore]
     public TimeSpan Duration => (Open ? LastSeen : Left) - Arrived;
 }

@@ -333,6 +333,12 @@ public class Configuration : IPluginConfiguration
     }
 
     // The currently-selected venue (always valid; creates a default if needed).
+    // MUST NOT be serialized: it returns a full VenueProfile (visitors, visit
+    // sessions, time database), and Newtonsoft would otherwise write a complete
+    // second copy of the active venue on every save - the same class of bug that
+    // ballooned configs with the active menu. (Fixed v1.5.1.0; ActiveMenuProfile
+    // already carried this attribute.)
+    [Newtonsoft.Json.JsonIgnore]
     public VenueProfile ActiveVenueProfile
     {
         get

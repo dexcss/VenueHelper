@@ -33,8 +33,11 @@ public unsafe class TradeWatcher
     public void Update()
     {
         if (Plugin.Panic) return; // master kill switch: don't watch trades
-        // Only watch trades when a raffle is actively running AND auto-credit is on.
-        if (!Plugin.Configuration.RaffleActive || !Plugin.Configuration.RaffleAutoTrade)
+        // Watch trades when a raffle is actively running AND auto-credit is on
+        // (v1.5.1.0: also when a bar game is capturing, so buy-ins credit without
+        // needing a raffle to be live at the same time).
+        var barGameTracking = Plugin.BarGames.ActiveTrackingGame != null;
+        if ((!Plugin.Configuration.RaffleActive || !Plugin.Configuration.RaffleAutoTrade) && !barGameTracking)
         {
             ResetSnapshot();
             WasOpen = false;

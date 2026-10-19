@@ -32,6 +32,7 @@ public class AuctionEntry
         Added = DateTime.Now;
     }
 
+    [Newtonsoft.Json.JsonIgnore]
     public string NameOnly
     {
         get
@@ -41,6 +42,7 @@ public class AuctionEntry
         }
     }
 
+    [Newtonsoft.Json.JsonIgnore]
     public string DisplayName => FullName.Replace('\uE05D', '@');
 }
 
@@ -69,6 +71,7 @@ public class AuctionRecord
         When = DateTime.Now;
     }
 
+    [Newtonsoft.Json.JsonIgnore]
     public string NameOnly
     {
         get
@@ -78,12 +81,15 @@ public class AuctionRecord
         }
     }
 
+    [Newtonsoft.Json.JsonIgnore]
     public string DisplayName => FullName.Replace('\uE05D', '@');
 
     // Gil the house keeps from this sale. Negative sales (sold TO the house,
     // e.g. -200000) take no cut \u2014 the house is paying out, not earning.
+    [Newtonsoft.Json.JsonIgnore]
     public long HouseCut => SalePrice < 0 ? 0 : (long)Math.Round(SalePrice * (HouseCutPercent / 100.0));
 
     // Gil the seller takes home.
+    [Newtonsoft.Json.JsonIgnore]
     public long Payout => SalePrice - HouseCut;
 }

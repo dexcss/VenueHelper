@@ -8,6 +8,7 @@ public class GiveawayWinner
     public string Note = string.Empty;     // e.g. "Highest \u2014 rolled 998"
     public DateTime When = DateTime.Now;
 
+    [Newtonsoft.Json.JsonIgnore]
     public string NameOnly
     {
         get
@@ -38,8 +39,10 @@ public class GiveawayHistoryEntry
     public List<GiveawayWinner> Winners = new();
     public List<GiveawayContribution> Contributions = new();
 
+    [Newtonsoft.Json.JsonIgnore]
     public string WinnerSummary =>
         Winners.Count == 0 ? "(none)" : string.Join(", ", Winners.Select(w => w.NameOnly));
+    [Newtonsoft.Json.JsonIgnore]
     public string ContributorSummary =>
         Contributions.Count == 0 ? "(none)" : string.Join(", ", Contributions.Select(c => $"{c.Name} {c.Amount:N0}"));
 }

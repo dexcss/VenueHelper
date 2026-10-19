@@ -54,6 +54,7 @@ public class MenuSale
     public int Quantity = 1;
 
     // Per-item price, derived from the total (guards against a 0/absent qty).
+    [Newtonsoft.Json.JsonIgnore]
     public long UnitPrice => Quantity > 1 ? Price / Quantity : Price;
 
     public MenuSale() { }

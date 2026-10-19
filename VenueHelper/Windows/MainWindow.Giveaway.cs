@@ -40,14 +40,10 @@ public partial class MainWindow
         if (showPot)
         {
             ImGui.TextColored(Blue, "Pot");
-            var house = Config.GiveawayHousePot;
-            var houseText = house == 0 ? string.Empty : house.ToString();
-            ImGui.SetNextItemWidth(SW(160));
-            if (ImGui.InputTextWithHint("##housepot", "House pot (e.g. 3.4M)", ref houseText, 24))
-            {
-                if (GilFormat.TryParse(houseText, out var parsed)) { Config.GiveawayHousePot = Math.Max(0, parsed); Config.Save(); }
-                else if (string.IsNullOrWhiteSpace(houseText)) { Config.GiveawayHousePot = 0; Config.Save(); }
-            }
+            // v1.5.1.0: raw-text buffer — the box used to rebuild from the saved
+            // value every frame, so typing "3.4M" snapped mid-keystroke.
+            GilInput("##housepot", "House pot (e.g. 3.4M)", Config.GiveawayHousePot,
+                v => { Config.GiveawayHousePot = Math.Max(0, v); Config.Save(); }, 160);
             ImGui.SameLine();
             ImGui.TextColored(Gold, $"Total pot: {GilFormat.Short(Give.TotalPot)} ({Give.TotalPot:N0} gil)");
 
@@ -205,8 +201,10 @@ public partial class MainWindow
                 : $"LIVE  {(int)since.TotalMinutes:00}:{since.Seconds:00}  \u2014  {Give.Count} rolls");
         }
         ImGui.SameLine();
-        if (ImGui.Button("Reset##giveaway"))
-            ImGui.OpenPopup("##resetgiveaway");
+        DestructiveButton("Reset##giveaway", "##resetgiveaway",
+            "Reset for a new giveaway? The current winners, pot, and contributors are saved to History first, then cleared.",
+            () => { Give.Reset(); SetStatus("Giveaway archived to history and cleared.", Green); },
+            "Yes, reset");
         ImGui.SameLine();
         if (ImGui.Button(showGiveawayHistory ? "Hide history" : $"History ({Give.History.Count})"))
             showGiveawayHistory = !showGiveawayHistory;
@@ -268,7 +266,9 @@ public partial class MainWindow
                 if (ImGui.BeginPopup("##clearghist"))
                 {
                     ImGui.TextColored(Red, "Delete all giveaway history?");
+                    ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.6f, 0.1f, 0.1f, 1f));
                     if (ImGui.Button("Yes, delete all")) { Give.ClearHistory(); ImGui.CloseCurrentPopup(); }
+                    ImGui.PopStyleColor();
                     ImGui.SameLine();
                     if (ImGui.Button("Cancel")) ImGui.CloseCurrentPopup();
                     ImGui.EndPopup();
@@ -379,13 +379,13 @@ public partial class MainWindow
         const ImGuiTableFlags flags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg
                                       | ImGuiTableFlags.ScrollY | ImGuiTableFlags.SizingStretchProp;
 
-        if (ImGui.BeginTable("##giveawaycounted", 5, flags, new Vector2(0, 220)))
+        if (ImGui.BeginTable("##giveawaycounted", 5, flags, new Vector2(0, SW(220))))
         {
             ImGui.TableSetupScrollFreeze(0, 1);
             ImGui.TableSetupColumn("Player", ImGuiTableColumnFlags.WidthStretch, 1.8f);
             ImGui.TableSetupColumn("World", ImGuiTableColumnFlags.WidthStretch, 1.0f);
-            ImGui.TableSetupColumn("Roll", ImGuiTableColumnFlags.WidthFixed, 70);
-            ImGui.TableSetupColumn("Out Of", ImGuiTableColumnFlags.WidthFixed, 70);
+            ImGui.TableSetupColumn("Roll", ImGuiTableColumnFlags.WidthFixed, SW(70));
+            ImGui.TableSetupColumn("Out Of", ImGuiTableColumnFlags.WidthFixed, SW(70));
             ImGui.TableSetupColumn("Winner", ImGuiTableColumnFlags.WidthFixed, SW(70));
             ImGui.TableHeadersRow();
 
@@ -394,9 +394,21 @@ public partial class MainWindow
                 ? Give.Entries.OrderByDescending(x => x.When)
                 : Give.Entries.OrderByDescending(x => x.Roll);
 
+            // v1.5.1.0: resolve the per-mode winners ONCE per frame instead of
+            // rescanning the whole list for every row (O(n) -> O(1) per row).
+            Guid? hId = null, lId = null, cId = null;
+            if (!Give.ExactMatchOn)
+            {
+                if (Give.Modes.HasFlag(GiveawayMode.Highest)) hId = Give.Highest?.Id;
+                if (Give.Modes.HasFlag(GiveawayMode.Lowest)) lId = Give.Lowest?.Id;
+                if (Give.Modes.HasFlag(GiveawayMode.Closest)) cId = Give.Closest?.Id;
+            }
+
             foreach (var e in ordered)
             {
-                var winner = Give.IsWinner(e);
+                var winner = Give.ExactMatchOn
+                    ? Give.IsWinner(e)
+                    : e.Id == hId || e.Id == lId || e.Id == cId;
                 ImGui.TableNextRow();
                 ImGui.TableNextColumn();
                 ImGui.AlignTextToFramePadding();
@@ -445,20 +457,24 @@ public partial class MainWindow
 
         // ---- Verification feed (every roll) ---------------------------
         ImGui.TextColored(Blue, "All rolls (verification feed):");
-        if (ImGui.BeginTable("##giveawayfeed", 4, flags, new Vector2(0, 160)))
+        if (ImGui.BeginTable("##giveawayfeed", 4, flags, new Vector2(0, SW(160))))
         {
             ImGui.TableSetupScrollFreeze(0, 1);
-            ImGui.TableSetupColumn("Time", ImGuiTableColumnFlags.WidthFixed, 80);
+            ImGui.TableSetupColumn("Time", ImGuiTableColumnFlags.WidthFixed, SW(80));
             ImGui.TableSetupColumn("Player", ImGuiTableColumnFlags.WidthStretch, 1.8f);
-            ImGui.TableSetupColumn("Roll", ImGuiTableColumnFlags.WidthFixed, 70);
-            ImGui.TableSetupColumn("Out Of", ImGuiTableColumnFlags.WidthFixed, 70);
+            ImGui.TableSetupColumn("Roll", ImGuiTableColumnFlags.WidthFixed, SW(70));
+            ImGui.TableSetupColumn("Out Of", ImGuiTableColumnFlags.WidthFixed, SW(70));
             ImGui.TableHeadersRow();
+
+            // v1.5.1.0: the counted-roll ids as a set — checking every feed row
+            // against every counted roll was O(counted x feed) per frame.
+            var countedIds = new HashSet<Guid>(Give.Entries.Select(e => e.Id));
 
             foreach (var f in Give.Feed)
             {
                 // In standard mode, a feed roll is "counted" if it's the first
                 // for that player. In race mode every roll counts.
-                var counted = !f.Invalid && (Give.ExactMatchOn || Give.IsCounted(f));
+                var counted = !f.Invalid && (Give.ExactMatchOn || countedIds.Contains(f.Id));
                 ImGui.TableNextRow();
                 ImGui.TableNextColumn();
                 ImGui.AlignTextToFramePadding();

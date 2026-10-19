@@ -90,7 +90,11 @@ public sealed class Plugin : IDalamudPlugin
         Scheduler.Update();
     }
 
-    private void DrawUI() => WindowSystem.Draw();
+    private void DrawUI()
+    {
+        MainWindow.DrawDialogs();
+        WindowSystem.Draw();
+    }
     private void OpenMain() => MainWindow.IsOpen = true;
 
     // Returns the full "Name\uE05DWorld" of the current target, or "" if none /
@@ -105,10 +109,13 @@ public sealed class Plugin : IDalamudPlugin
 
     [Command("/venuehelper")]
     [Aliases("/vhelp", "/vh")]
-    [HelpMessage("Opens the Venue Helper window (counter, raffle, auction).")]
+    [HelpMessage("Opens Venue Helper. /vh <tab> jumps to a tab, e.g. /vh raffle, /vh shout, /vh bar, /vh menu, /vh employees.")]
     public void OnCommand(string command, string args)
     {
         MainWindow.IsOpen = true;
+        // v1.5.1.0: "/vh <tab>" jumps straight to that tab. Bare "/vh" just opens.
+        if (!string.IsNullOrWhiteSpace(args))
+            MainWindow.RequestTab(args);
     }
 
     public void Dispose()

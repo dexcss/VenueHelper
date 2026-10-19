@@ -33,6 +33,7 @@ public class RaffleEntry
         FirstSeen = DateTime.Now;
     }
 
+    [Newtonsoft.Json.JsonIgnore]
     public string NameOnly
     {
         get
@@ -42,6 +43,7 @@ public class RaffleEntry
         }
     }
 
+    [Newtonsoft.Json.JsonIgnore]
     public string World
     {
         get
@@ -51,12 +53,15 @@ public class RaffleEntry
         }
     }
 
+    [Newtonsoft.Json.JsonIgnore]
     public string DisplayName => FullName.Replace('\uE05D', '@');
 
     // Total tickets in the draw (paid + free) \u2014 used for assigning numbers
     // and building the wheel list.
+    [Newtonsoft.Json.JsonIgnore]
     public int TicketCount => Math.Max(0, Tickets) + Math.Max(0, FreeTickets);
 
     // Paid tickets only \u2014 used for the pot value.
+    [Newtonsoft.Json.JsonIgnore]
     public int PaidTickets => Math.Max(0, Tickets);
 }

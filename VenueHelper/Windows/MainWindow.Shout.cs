@@ -58,7 +58,10 @@ public partial class MainWindow
             var msg = preset.Message;
             var sendWidth = ImGui.CalcTextSize("Send").X + ImGui.GetStyle().FramePadding.X * 2;
             var xWidth = ImGui.CalcTextSize(" X ").X + ImGui.GetStyle().FramePadding.X * 2;
-            var boxW = ImGui.GetContentRegionAvail().X - sendWidth - xWidth - SW(16);
+            // Floor the box width so a very narrow window can't drive it
+            // negative (a negative SetNextItemWidth means "fill available",
+            // which would misbehave here).
+            var boxW = Math.Max(SW(80), ImGui.GetContentRegionAvail().X - sendWidth - xWidth - SW(16));
             // ImGui text inputs don't word-wrap, so the editable field stays a
             // single line (it scrolls while you type). The full message is shown
             // wrapped just below so you can always read all of it.

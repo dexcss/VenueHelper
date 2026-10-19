@@ -56,7 +56,7 @@ public partial class MainWindow
             Config.Save();
         }
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Baseline pacing for serve sequences/macros. Each step can still set its own wait; this is the default for new steps. ~1200ms stays under the chat spam-block.");
+            ImGui.SetTooltip("Baseline pacing for serve sequences/macros. Each step can still set its own wait; this value is pre-filled on every NEWLY ADDED step (v1.5.1.0: previously this setting had no effect). ~1200ms stays under the chat spam-block.");
 
         ImGuiHelpers.ScaledDummy(8f);
         ImGui.Separator();
@@ -110,6 +110,14 @@ public partial class MainWindow
         ImGui.SetNextItemWidth(SW(380));
         ImGui.InputTextWithHint("##backupfolder", "Folder to save into (blank = plugin folder)", ref backupFolder, 260);
         ImGui.SameLine();
+        if (ImGui.Button("Browse...##bkfolder"))
+        {
+            fileDialogs.OpenFolderDialog("Choose a backup folder", (ok, path) =>
+            {
+                if (ok) backupFolder = path;
+            });
+        }
+        ImGui.SameLine();
         if (ImGui.Button("Save backup"))
         {
             var (ok, msg) = Config.ExportBackup(backupFolder);
@@ -124,6 +132,14 @@ public partial class MainWindow
         WrapText(Red, "Restoring REPLACES all current data with the file's contents. Make a backup first if unsure.");
         ImGui.SetNextItemWidth(SW(440));
         ImGui.InputTextWithHint("##restorepath", "Full path to a VenueHelper-backup-*.json", ref restorePath, 400);
+        ImGui.SameLine();
+        if (ImGui.Button("Browse...##restorefile"))
+        {
+            fileDialogs.OpenFileDialog("Choose a backup file", "JSON backup files{.json}", (ok, path) =>
+            {
+                if (ok) restorePath = path;
+            });
+        }
         ImGui.SameLine();
         if (!restoreConfirm)
         {

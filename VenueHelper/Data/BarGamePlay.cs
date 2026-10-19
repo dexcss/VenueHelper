@@ -20,6 +20,7 @@ public class BarGamePlay
         When = DateTime.Now;
     }
 
+    [Newtonsoft.Json.JsonIgnore]
     public string NameOnly
     {
         get
@@ -55,6 +56,7 @@ public class BarGamePlayer
     public BarGamePlayer() { }
     public BarGamePlayer(string fullName) => FullName = fullName;
 
+    [Newtonsoft.Json.JsonIgnore]
     public string NameOnly
     {
         get

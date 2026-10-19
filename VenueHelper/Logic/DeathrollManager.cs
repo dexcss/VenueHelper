@@ -38,9 +38,11 @@ public class DeathrollManager
     }
 
     // The match currently being actively refereed (rolls are routed here).
+    // TryParse, not Parse: a corrupted config string must never throw while
+    // drawing the UI (v1.5.1.0).
     public Guid? ActiveMatchId
     {
-        get => string.IsNullOrEmpty(Config.DeathrollActiveMatch) ? null : Guid.Parse(Config.DeathrollActiveMatch);
+        get => Guid.TryParse(Config.DeathrollActiveMatch, out var id) ? id : null;
         set { Config.DeathrollActiveMatch = value?.ToString() ?? string.Empty; Config.Save(); }
     }
 

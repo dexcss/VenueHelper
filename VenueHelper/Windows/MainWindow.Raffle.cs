@@ -67,7 +67,10 @@ public partial class MainWindow
         // ---- Settings -------------------------------------------------
         ImGui.SetNextItemWidth(SW(140));
         if (ImGui.InputFloat("House cut %", ref raffleHouseCutInput, 1f, 5f, "%.0f"))
+        {
             Raffle.SetHouseCut(raffleHouseCutInput);
+            raffleHouseCutInput = Raffle.HouseCutPercent; // resync the box to the clamped/rounded value
+        }
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Percentage the house keeps (e.g. 20 for an 80/20 split). Shown in the pot summary below.");
 
@@ -200,23 +203,10 @@ public partial class MainWindow
             if (avail > resetW)
                 ImGui.SetCursorPosX(ImGui.GetCursorPosX() + avail - resetW);
         }
-        ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.45f, 0.15f, 0.15f, 1f));
-        if (ImGui.Button("Reset Raffle"))
-            ImGui.OpenPopup("##resetraffle");
-        ImGui.PopStyleColor();
-        if (ImGui.BeginPopup("##resetraffle"))
-        {
-            WrapText(Red, "Reset for a new raffle? The current entries and winner are saved to History first, then cleared.");
-            if (ImGui.Button("Yes, reset"))
-            {
-                Raffle.Reset();
-                SetStatus("Raffle archived to history and cleared.", Green);
-                ImGui.CloseCurrentPopup();
-            }
-            ImGui.SameLine();
-            if (ImGui.Button("Cancel")) ImGui.CloseCurrentPopup();
-            ImGui.EndPopup();
-        }
+        DestructiveButton("Reset Raffle", "##resetraffle",
+            "Reset for a new raffle? The current entries and winner are saved to History first, then cleared.",
+            () => { Raffle.Reset(); SetStatus("Raffle archived to history and cleared.", Green); },
+            "Yes, reset");
 
         // Pot summary uses PAID tickets only (free/comp tickets don't add gil).
         var pot = (long)Raffle.TotalPaidTickets * Config.TicketCost;
@@ -288,7 +278,7 @@ public partial class MainWindow
         const ImGuiTableFlags flags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg
                                       | ImGuiTableFlags.ScrollY | ImGuiTableFlags.SizingStretchProp;
 
-        if (ImGui.BeginTable("##raffletable", 6, flags, new Vector2(0, 280)))
+        if (ImGui.BeginTable("##raffletable", 6, flags, new Vector2(0, SW(280))))
         {
             ImGui.TableSetupScrollFreeze(0, 1);
             ImGui.TableSetupColumn("Player", ImGuiTableColumnFlags.WidthStretch, 1.8f);

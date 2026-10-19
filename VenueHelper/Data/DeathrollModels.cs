@@ -11,6 +11,7 @@ public class DeathrollPlayer
     public DeathrollPlayer() { }
     public DeathrollPlayer(string fullName) { FullName = fullName; }
 
+    [Newtonsoft.Json.JsonIgnore]
     public string NameOnly
     {
         get
@@ -20,6 +21,7 @@ public class DeathrollPlayer
         }
     }
 
+    [Newtonsoft.Json.JsonIgnore]
     public string World
     {
         get
@@ -29,6 +31,7 @@ public class DeathrollPlayer
         }
     }
 
+    [Newtonsoft.Json.JsonIgnore]
     public string DisplayName => FullName.Replace('\uE05D', '@');
 }
 
