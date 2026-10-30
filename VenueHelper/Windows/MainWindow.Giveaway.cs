@@ -2,6 +2,8 @@ using Dalamud.Interface.Utility;
 using VenueHelper.Data;
 using VenueHelper.Logic;
 
+using VenueHelper.FancyUI;
+
 namespace VenueHelper.Windows;
 
 public partial class MainWindow
@@ -32,11 +34,16 @@ public partial class MainWindow
 
         // ---- Optional pot + contributors ------------------------------
         var showPot = Config.GiveawayShowPot;
-        if (ImGui.Checkbox("Show pot and additional contributors", ref showPot))
+        var showPotNew = UiKit.Toggle("##g-showpot", showPot);
+        ImGui.SameLine(0, Theme.Gap);
+        ImGui.TextUnformatted("Show pot and additional contributors");
+        if (showPotNew != showPot)
         {
-            Config.GiveawayShowPot = showPot;
+            Config.GiveawayShowPot = showPotNew;
             Config.Save();
         }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Adds the house-pot box, contributor list, and pot totals.");
         if (showPot)
         {
             ImGui.TextColored(Blue, "Pot");
@@ -108,12 +115,15 @@ public partial class MainWindow
         // capture \u2014 the host just uses the announce line, pot/contributors, and
         // winner log. It takes over the whole mode UI when on.
         var manual = Give.ManualOn;
-        if (ImGui.Checkbox("Manual (giveaway run elsewhere, e.g. Twitch)", ref manual))
-        {
-            Give.Modes = manual ? GiveawayMode.Manual : GiveawayMode.Highest;
-        }
+        var manualNew = UiKit.Toggle("##g-manual", manual);
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("No in-game rolls are captured. Use the announce line, pot/contributor tracking, and tick a winner by hand. Good for giveaways you draw on stream.");
+        ImGui.SameLine(0, Theme.Gap);
+        ImGui.TextUnformatted("Manual (giveaway run elsewhere, e.g. Twitch)");
+        if (manualNew != manual)
+        {
+            Give.Modes = manualNew ? GiveawayMode.Manual : GiveawayMode.Highest;
+        }
 
         if (Give.ManualOn)
         {
@@ -124,14 +134,17 @@ public partial class MainWindow
         // Exact-match is a different game style, so it's a single toggle that
         // takes over when on (the highest/lowest/closest options are for the
         // standard "first roll per player" style).
-        if (ImGui.Checkbox("Roll until someone hits a number (race)", ref exact))
+        var exactNew = UiKit.Toggle("##g-race", exact);
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Race mode: every roll counts and the first person to roll the target number wins.");
+        ImGui.SameLine(0, Theme.Gap);
+        ImGui.TextUnformatted("Roll until someone hits a number (race)");
+        if (exactNew != exact)
         {
-            Give.Modes = exact
+            Give.Modes = exactNew
                 ? GiveawayMode.ExactMatch
                 : GiveawayMode.Highest; // fall back to a sensible default
         }
-        if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Race mode: every roll counts and the first person to roll the target number wins.");
 
         if (Give.ExactMatchOn)
         {
@@ -147,19 +160,24 @@ public partial class MainWindow
         }
         else
         {
-            // Standard highest / lowest / closest selection.
+            // Standard highest / lowest / closest selection. v1.5.2.0: mode
+            // chips (kit ToggleChip) instead of three stock checkboxes — the
+            // flag read-modify-write semantics are unchanged.
             var modes = Give.Modes;
             var highest = modes.HasFlag(GiveawayMode.Highest);
-            if (ImGui.Checkbox("Highest", ref highest))
-                Give.Modes = highest ? modes | GiveawayMode.Highest : modes & ~GiveawayMode.Highest;
+            var highestNew = UiKit.ToggleChip("##g-high", "Highest", highest);
+            if (highestNew != highest)
+                Give.Modes = highestNew ? modes | GiveawayMode.Highest : modes & ~GiveawayMode.Highest;
             ImGui.SameLine();
             var lowest = Give.Modes.HasFlag(GiveawayMode.Lowest);
-            if (ImGui.Checkbox("Lowest", ref lowest))
-                Give.Modes = lowest ? Give.Modes | GiveawayMode.Lowest : Give.Modes & ~GiveawayMode.Lowest;
+            var lowestNew = UiKit.ToggleChip("##g-low", "Lowest", lowest);
+            if (lowestNew != lowest)
+                Give.Modes = lowestNew ? Give.Modes | GiveawayMode.Lowest : Give.Modes & ~GiveawayMode.Lowest;
             ImGui.SameLine();
             var closest = Give.Modes.HasFlag(GiveawayMode.Closest);
-            if (ImGui.Checkbox("Closest to", ref closest))
-                Give.Modes = closest ? Give.Modes | GiveawayMode.Closest : Give.Modes & ~GiveawayMode.Closest;
+            var closestNew = UiKit.ToggleChip("##g-close", "Closest to", closest);
+            if (closestNew != closest)
+                Give.Modes = closestNew ? Give.Modes | GiveawayMode.Closest : Give.Modes & ~GiveawayMode.Closest;
             ImGui.SameLine();
             ImGui.SetNextItemWidth(SW(140));
             var target = Give.ClosestTarget;
@@ -173,27 +191,26 @@ public partial class MainWindow
         ImGuiHelpers.ScaledDummy(6f);
 
         // ---- Start / Stop / Reset -------------------------------------
+        // v1.5.2.0: gradient CTAs at the old 90px footprint so the row keeps
+        // its Reset/History utilities on the same line.
+        var ctaW = ImGui.CalcTextSize("START GIVEAWAY").X + 28f * Theme.UiScale;
         if (!Give.Running)
         {
-            ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.20f, 0.45f, 0.25f, 1f));
-            if (ImGui.Button("Start", new Vector2(90, 0)))
+            if (UiKit.GradientButton("##giveaway-start", "START GIVEAWAY", Theme.Accent, Theme.Good, 30f, ctaW))
             {
                 Give.Start();
                 SetStatus(Give.ExactMatchOn
                     ? $"Race started \u2014 first to roll {Give.MatchTarget} wins."
                     : "Giveaway started \u2014 first /random per player counts.", Green);
             }
-            ImGui.PopStyleColor();
         }
         else
         {
-            ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.5f, 0.2f, 0.2f, 1f));
-            if (ImGui.Button("Stop", new Vector2(90, 0)))
+            if (UiKit.GradientButton("##giveaway-stop", "STOP", Theme.Warn, Theme.Danger, 30f, ctaW))
             {
                 Give.Stop();
                 SetStatus($"Giveaway stopped. {Give.Count} rolls.", Gold);
             }
-            ImGui.PopStyleColor();
             var since = DateTime.Now - Give.StartedAt;
             ImGui.SameLine();
             WrapText(Green, Give.ManualOn

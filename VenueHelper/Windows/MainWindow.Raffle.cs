@@ -4,6 +4,8 @@ using Dalamud.Interface.Utility;
 using VenueHelper.Data;
 using VenueHelper.Logic;
 
+using VenueHelper.FancyUI;
+
 namespace VenueHelper.Windows;
 
 public partial class MainWindow
@@ -41,17 +43,22 @@ public partial class MainWindow
         WrapText(Grey, "Enter how many tickets each player bought, then assign 0-999 for the draw.");
 
         // ---- Raffle enable (master tracking switch) -------------------
+        // v1.5.2.0: kit slide toggle instead of a stock checkbox (same config
+        // writes and status messages; the tooltip survives on either control).
         var active = Config.RaffleActive;
-        ImGui.PushStyleColor(ImGuiCol.Text, active ? new Vector4(0.4f, 0.85f, 0.4f, 1f) : new Vector4(0.7f, 0.7f, 0.7f, 1f));
-        if (ImGui.Checkbox(active ? "Raffle ON (watching trades for tickets)" : "Enable raffle (start watching trades)", ref active))
-        {
-            Config.RaffleActive = active;
-            Config.Save();
-            SetStatus(active ? "Raffle enabled \u2014 trades will be credited as tickets." : "Raffle disabled \u2014 not watching trades.", active ? Green : Grey);
-        }
-        ImGui.PopStyleColor();
-        if (ImGui.IsItemHovered())
+        var activeNew = UiKit.Toggle("##raffleactive", active);
+        var toggleHovered = ImGui.IsItemHovered();
+        ImGui.SameLine(0, Theme.Gap);
+        ImGui.TextColored(active ? Green : Grey,
+            active ? "Raffle ON (watching trades for tickets)" : "Enable raffle (start watching trades)");
+        if (toggleHovered)
             ImGui.SetTooltip("When off, the raffle does NOT watch or claim any trades. Turn it on while a raffle is running, off when it's done.");
+        if (activeNew != active)
+        {
+            Config.RaffleActive = activeNew;
+            Config.Save();
+            SetStatus(activeNew ? "Raffle enabled \u2014 trades will be credited as tickets." : "Raffle disabled \u2014 not watching trades.", activeNew ? Green : Grey);
+        }
 
 
         // Warn if a bar game is currently capturing trades \u2014 they'd be taken as
@@ -76,13 +83,16 @@ public partial class MainWindow
 
         ImGui.SameLine(0, 24);
         var autoTrade = Config.RaffleAutoTrade;
-        if (ImGui.Checkbox("Auto-credit trades as tickets", ref autoTrade))
-        {
-            Config.RaffleAutoTrade = autoTrade;
-            Config.Save();
-        }
+        var autoTradeNew = UiKit.Toggle("##raffleautotrade", autoTrade);
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("When a trade completes, the gil received is divided by the ticket cost and added as tickets.");
+        ImGui.SameLine(0, Theme.Gap);
+        ImGui.TextUnformatted("Auto-credit trades as tickets");
+        if (autoTradeNew != autoTrade)
+        {
+            Config.RaffleAutoTrade = autoTradeNew;
+            Config.Save();
+        }
         ImGui.SameLine(0, 12);
         var costInput = (int)Config.TicketCost;
         ImGui.SetNextItemWidth(SW(150));

@@ -2,6 +2,8 @@ using Dalamud.Interface.Utility;
 using VenueHelper.Data;
 using VenueHelper.Logic;
 
+using VenueHelper.FancyUI;
+
 namespace VenueHelper.Windows;
 
 public partial class MainWindow
@@ -56,7 +58,9 @@ public partial class MainWindow
             // Message box (multi-line, height follows the line-count setting).
             ImGui.SameLine();
             var msg = preset.Message;
-            var sendWidth = ImGui.CalcTextSize("Send").X + ImGui.GetStyle().FramePadding.X * 2;
+            // v1.5.2.0: Send is a kit chip; its width metric matches ChipButton's
+            // own (label + 2*8s padding) so the floored box width below stays right.
+            var sendWidth = ImGui.CalcTextSize("Send").X + 20f * Theme.UiScale;
             var xWidth = ImGui.CalcTextSize(" X ").X + ImGui.GetStyle().FramePadding.X * 2;
             // Floor the box width so a very narrow window can't drive it
             // negative (a negative SetNextItemWidth means "fill available",
@@ -76,7 +80,7 @@ public partial class MainWindow
             ImGui.SameLine();
             var empty = string.IsNullOrWhiteSpace(preset.Message);
             if (empty) ImGui.BeginDisabled();
-            if (ImGui.Button("Send"))
+            if (UiKit.ChipButton($"##shoutsend{i}", "Send", true, sendWidth))
             {
                 var (ok, message) = ChatSender.SendToChannel(preset.Channel, preset.Message);
                 SetStatus(ok ? $"Sent to {ChannelLabels[(int)preset.Channel]}." : message, ok ? Green : Red);

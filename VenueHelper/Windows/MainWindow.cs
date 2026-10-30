@@ -1,11 +1,12 @@
+using Dalamud.Interface;
 using Dalamud.Interface.ImGuiFileDialog;
-using Dalamud.Interface.Windowing;
 using Dalamud.Interface.Utility;
+using VenueHelper.FancyUI;
 using VenueHelper.Logic;
 
 namespace VenueHelper.Windows;
 
-public partial class MainWindow : Window, IDisposable
+public partial class MainWindow : ShellWindow, IDisposable
 {
     private readonly Plugin Plugin;
     private Configuration Config => Plugin.Configuration;
@@ -13,11 +14,14 @@ public partial class MainWindow : Window, IDisposable
     private RaffleService Raffle => Plugin.Raffle;
     private AuctionService Auction => Plugin.Auction;
 
-    internal static readonly Vector4 Gold = new(1.0f, 0.84f, 0.10f, 1.0f);
-    internal static readonly Vector4 Green = new(0.40f, 0.95f, 0.40f, 1.0f);
-    internal static readonly Vector4 Red = new(0.95f, 0.40f, 0.40f, 1.0f);
-    internal static readonly Vector4 Blue = new(0.50f, 0.75f, 1.0f, 1.0f);
-    internal static readonly Vector4 Grey = new(0.6f, 0.6f, 0.6f, 1.0f);
+    // v1.5.2.0 Fancy UI reskin: the legacy palette names are aliased onto the
+    // FancyUI.Theme tokens (the Market Helper adoption pattern) so every existing
+    // TextColored call site renders themed without touching behaviour code.
+    internal static readonly Vector4 Gold = Theme.Accent;
+    internal static readonly Vector4 Green = Theme.Good;
+    internal static readonly Vector4 Red = Theme.Danger;
+    internal static readonly Vector4 Blue = Theme.Muted;
+    internal static readonly Vector4 Grey = Theme.Muted;
 
     // Scales a fixed pixel width by Dalamud's global UI scale so inputs (and the
     // +/- buttons ImGui draws inside InputInt/InputFloat) don't clip or overflow
@@ -93,34 +97,32 @@ public partial class MainWindow : Window, IDisposable
     private string statusTab = string.Empty;
     private string currentTab = string.Empty;
 
-    public MainWindow(Plugin plugin) : base("Venue Helper##VenueHelperMain")
+    public MainWindow(Plugin plugin)
+        : base("Venue Helper##VenueHelperMain", "Venue Helper", new Vector2(660, 540), null)
     {
         Plugin = plugin;
-        SizeConstraints = new WindowSizeConstraints
-        {
-            MinimumSize = new Vector2(660, 540),
-            MaximumSize = new Vector2(float.MaxValue, float.MaxValue),
-        };
     }
 
     public void Dispose() { }
 
-    // Tab registry: stable id -> (display label, draw action). Order here is the
-    // DEFAULT order for anyone who hasn't customized it.
-    private readonly record struct TabDef(string Id, string Label, Action Draw);
+    // Tab registry: stable id -> (display label, tab icon, draw action). Order
+    // here is the DEFAULT order for anyone who hasn't customized it. The icon is
+    // presentation only (drawn as a glyph prefix in the tab strip); RequestTab
+    // matches on Id/Label, never on the drawn string.
+    private readonly record struct TabDef(string Id, string Label, FontAwesomeIcon Icon, Action Draw);
 
     private List<TabDef> AllTabs() => new()
     {
-        new("counter",  "Venue Counter",     DrawCounterTab),
-        new("raffle",   "Raffle Helper",     DrawRaffleTab),
-        new("auction",  "Auction Helper",    DrawAuctionTab),
-        new("giveaway", "Giveaway Helper",   DrawGiveawayTab),
-        new("deathroll","DR Tourny Helper",  DrawDeathrollTab),
-        new("shout",    "Shout/Yell Helper", DrawShoutTab),
-        new("bargame",  "Bar Game Helper",   DrawBarGameTab),
-        new("menu",     "Menu Helper",       DrawMenuTab),
-        new("employees","Employees",         DrawEmployeesTab),
-        new("settings", "Settings",          DrawSettingsTab),
+        new("counter",  "Venue Counter",     FontAwesomeIcon.Users,     DrawCounterTab),
+        new("raffle",   "Raffle Helper",     FontAwesomeIcon.Ticket,    DrawRaffleTab),
+        new("auction",  "Auction Helper",    FontAwesomeIcon.Gavel,     DrawAuctionTab),
+        new("giveaway", "Giveaway Helper",   FontAwesomeIcon.Gift,      DrawGiveawayTab),
+        new("deathroll","DR Tourny Helper",  FontAwesomeIcon.Dice,      DrawDeathrollTab),
+        new("shout",    "Shout/Yell Helper", FontAwesomeIcon.Bullhorn,  DrawShoutTab),
+        new("bargame",  "Bar Game Helper",   FontAwesomeIcon.Cocktail,  DrawBarGameTab),
+        new("menu",     "Menu Helper",       FontAwesomeIcon.Utensils,  DrawMenuTab),
+        new("employees","Employees",         FontAwesomeIcon.UserTie,   DrawEmployeesTab),
+        new("settings", "Settings",          FontAwesomeIcon.Cog,       DrawSettingsTab),
     };
 
     // Resolve the ordered, visible tab list from config. Unknown/new tabs are
@@ -174,7 +176,11 @@ public partial class MainWindow : Window, IDisposable
         if (t.HasValue) requestedTabId = t.Value.Id;
     }
 
-    public override void Draw()
+    // The tab bar renders inside the Fancy UI shell body (ShellWindow.Draw hosts
+    // it in the padded child). Tab labels gain a FontAwesome glyph prefix — the
+    // same shipped pattern Market Helper uses; Dalamud's default font atlas
+    // includes the icon glyphs, so no font push is needed for BeginTabItem.
+    protected override void DrawBody()
     {
         if (ImGui.BeginTabBar("##venuehelper_tabs"))
         {
@@ -186,7 +192,7 @@ public partial class MainWindow : Window, IDisposable
                 {
                     flags = ImGuiTabItemFlags.SetSelected;
                 }
-                if (ImGui.BeginTabItem(tab.Label, flags))
+                if (ImGui.BeginTabItem($"{tab.Icon.ToIconString()} {tab.Label}", flags))
                 {
                     tab.Draw();
                     ImGui.EndTabItem();
@@ -195,6 +201,39 @@ public partial class MainWindow : Window, IDisposable
             ImGui.EndTabBar();
         }
         requestedTabId = null; // one-shot
+    }
+
+    // Version text + one status lamp per background activity, drawn into the free
+    // title-bar span (the Market Helper header-extras pattern): raffle running,
+    // bar game capturing, panic mode.
+    protected override void DrawHeaderExtras(Vector2 freeMin, Vector2 freeMax)
+    {
+        var dl = ImGui.GetWindowDrawList();
+        var y = (freeMin.Y + freeMax.Y) * 0.5f;
+        var x = freeMin.X + Theme.Gap;
+
+        var ver = typeof(MainWindow).Assembly.GetName().Version;
+        var verText = ver == null ? string.Empty : "v" + ver.ToString(3);
+        var ts = ImGui.CalcTextSize(verText);
+        dl.AddText(new Vector2(x, y - ts.Y * 0.5f), Theme.U32(Theme.Muted), verText);
+        x += ts.X + Theme.Gap * 2f;
+
+        (bool on, Vector4 color, string name)[] lamps =
+        {
+            (Config.RaffleActive, Theme.Good, "Raffle active"),
+            (Plugin.BarGames.ActiveTrackingGame != null, Theme.Good, "Bar game capturing"),
+            (Plugin.Panic, Theme.Danger, "PANIC MODE - trades are not being watched"),
+        };
+        var r = 4f * Theme.UiScale;
+        foreach (var (on, color, name) in lamps)
+        {
+            dl.AddCircleFilled(new Vector2(x, y), r, Theme.U32(on ? color : Theme.Muted));
+            var hoverMin = new Vector2(x - r - 2f, y - r - 2f);
+            var hoverMax = new Vector2(x + r + 2f, y + r + 2f);
+            if (on && ImGui.IsMouseHoveringRect(hoverMin, hoverMax))
+                ImGui.SetTooltip(name);
+            x += 12f * Theme.UiScale;
+        }
     }
 
     // ---- Export -------------------------------------------------------
@@ -258,13 +297,15 @@ public partial class MainWindow : Window, IDisposable
             exportDirInit = true;
         }
 
-        // Right-align the button on the current line.
-        var btnWidth = ImGui.CalcTextSize("Export").X + ImGui.GetStyle().FramePadding.X * 2 + 16;
+        // Right-align the button on the current line. v1.5.2.0: kit ChipButton
+        // instead of a stock ImGui button (same click behaviour and popup).
+        var s = Theme.UiScale;
+        var btnWidth = ImGui.CalcTextSize("Export").X + 20f * s;
         var avail = ImGui.GetContentRegionAvail().X;
         if (avail > btnWidth)
             ImGui.SetCursorPosX(ImGui.GetCursorPosX() + avail - btnWidth);
 
-        if (ImGui.Button($"Export##{popupId}", new Vector2(btnWidth, 0)))
+        if (UiKit.ChipButton($"##export_{popupId}", "Export", false, btnWidth))
         {
             exportPopupStatus = string.Empty;
             try { exportManualCopy = Exporter.BuildText(items[0].Build()); }

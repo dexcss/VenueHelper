@@ -2,6 +2,8 @@ using Dalamud.Interface.Utility;
 using VenueHelper.Data;
 using VenueHelper.Logic;
 
+using VenueHelper.FancyUI;
+
 namespace VenueHelper.Windows;
 
 public partial class MainWindow
@@ -205,9 +207,14 @@ public partial class MainWindow
 
         // ---- Live capture ---------------------------------------------
         ImGui.TextColored(Gold, "Live");
+        // v1.5.2.0: gradient CTA (Fancy UI kit) at label width, so "Clear rolls"
+        // and "History" keep their place on the same row via SameLine below.
+        var ctaW = ImGui.CalcTextSize("START CAPTURING ROLLS").X + 28f * Theme.UiScale;
         if (!g.Tracking)
         {
-            if (ImGui.Button("Start capturing rolls"))
+            // Same click behaviour as before, including the raffle-conflict
+            // popup below.
+            if (UiKit.GradientButton("##bar-start-capture", "START CAPTURING ROLLS", Theme.Accent, Theme.Good, 36f, ctaW))
             {
                 if (Plugin.Raffle.IsClaimingTrades)
                     ImGui.OpenPopup("##barvsraffle");
@@ -236,10 +243,9 @@ public partial class MainWindow
         }
         else
         {
-            ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.15f, 0.4f, 0.2f, 1f));
-            if (ImGui.Button("Capturing... (click to stop)"))
+            // v1.5.2.0: the live CTA becomes a stop gradient while capturing.
+            if (UiKit.GradientButton("##bar-stop-capture", "CAPTURING... (CLICK TO STOP)", Theme.Warn, Theme.Danger, 36f, ctaW))
                 Bar.StopTracking(g);
-            ImGui.PopStyleColor();
         }
         ImGui.SameLine();
         DestructiveButton("Clear rolls", "##barclearrolls",

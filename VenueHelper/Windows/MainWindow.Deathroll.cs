@@ -2,6 +2,8 @@ using Dalamud.Interface.Utility;
 using VenueHelper.Data;
 using VenueHelper.Logic;
 
+using VenueHelper.FancyUI;
+
 namespace VenueHelper.Windows;
 
 public partial class MainWindow
@@ -30,19 +32,13 @@ public partial class MainWindow
 
     private void DrawDeathrollSetup()
     {
-        // Format toggle (button-based to match the rest of the UI).
+        // Format toggle. v1.5.2.0: kit segmented control (the two colour-pushed
+        // buttons did the same job with less affordance).
         var single = Dr.Kind == BracketKind.SingleElimination;
-        ImGui.TextColored(Grey, "Format:");
-        ImGui.SameLine();
-        if (single) ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.20f, 0.45f, 0.25f, 1f));
-        if (ImGui.Button("Single elimination"))
-            Dr.Kind = BracketKind.SingleElimination;
-        if (single) ImGui.PopStyleColor();
-        ImGui.SameLine();
-        if (!single) ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.20f, 0.45f, 0.25f, 1f));
-        if (ImGui.Button("Double elimination"))
-            Dr.Kind = BracketKind.DoubleElimination;
-        if (!single) ImGui.PopStyleColor();
+        var kindNew = UiKit.Segmented("##drformat",
+            new[] { "Single elimination", "Double elimination" }, single ? 0 : 1);
+        if ((kindNew == 0) != single)
+            Dr.Kind = kindNew == 0 ? BracketKind.SingleElimination : BracketKind.DoubleElimination;
         if (Dr.Kind == BracketKind.DoubleElimination)
             WrapText(Grey, "Losers get a second chance; a player is out after two losses.");
 
@@ -122,13 +118,13 @@ public partial class MainWindow
         }
 
         ImGuiHelpers.ScaledDummy(6f);
-        ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.20f, 0.45f, 0.25f, 1f));
-        if (ImGui.Button("Build Bracket", new Vector2(140, 0)))
+        // v1.5.2.0: gradient CTA at label width so "Clear All" stays on the row.
+        var drCtaW = ImGui.CalcTextSize("BUILD BRACKET").X + 28f * Theme.UiScale;
+        if (UiKit.GradientButton("##dr-build", "BUILD BRACKET", Theme.Accent, Theme.Good, 30f, drCtaW))
         {
             var (ok, msg) = Dr.BuildBracket();
             SetStatus(msg, ok ? Green : Red);
         }
-        ImGui.PopStyleColor();
         ImGui.SameLine();
         DestructiveButton("Clear All", "##drclear",
             "Are you sure? Remove all players?",

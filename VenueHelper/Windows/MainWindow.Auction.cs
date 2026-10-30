@@ -4,6 +4,8 @@ using Dalamud.Interface.Utility;
 using VenueHelper.Data;
 using VenueHelper.Logic;
 
+using VenueHelper.FancyUI;
+
 namespace VenueHelper.Windows;
 
 public partial class MainWindow
@@ -48,29 +50,29 @@ public partial class MainWindow
         // Prominent, right-aligned toggles between active list / history / buyers.
         ImGui.SameLine();
         {
+            // v1.5.2.0: kit ChipButtons with the active state instead of
+            // colour-pushed stock buttons; same mutual-exclusion behaviour.
             var buyersLabel = "Buyers";
             var toggleLabel = showAuctionHistory ? "\u2190 Active Auctions" : "History & Totals \u2192";
-            var w = ImGui.CalcTextSize(toggleLabel).X + ImGui.CalcTextSize(buyersLabel).X
-                    + ImGui.GetStyle().FramePadding.X * 4 + ImGui.GetStyle().ItemSpacing.X + SW(8);
+            var s = Theme.UiScale;
+            var w1 = ImGui.CalcTextSize(buyersLabel).X + 20f * s;
+            var w2 = ImGui.CalcTextSize(toggleLabel).X + 20f * s;
+            var w = w1 + ImGui.GetStyle().ItemSpacing.X + w2;
             var avail = ImGui.GetContentRegionAvail().X;
             if (avail > w)
                 ImGui.SetCursorPosX(ImGui.GetCursorPosX() + avail - w);
 
-            ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.30f, 0.30f, 0.45f, 1f));
-            if (ImGui.Button(buyersLabel))
+            if (UiKit.ChipButton("##a-buyers", buyersLabel, showBuyers))
             {
                 showBuyers = !showBuyers;
                 showAuctionHistory = false;
             }
-            ImGui.PopStyleColor();
             ImGui.SameLine();
-            ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.20f, 0.35f, 0.55f, 1f));
-            if (ImGui.Button(toggleLabel))
+            if (UiKit.ChipButton("##a-histview", toggleLabel, showAuctionHistory, w2))
             {
                 showAuctionHistory = !showAuctionHistory;
                 showBuyers = false;
             }
-            ImGui.PopStyleColor();
         }
 
         ImGuiHelpers.ScaledDummy(4f);

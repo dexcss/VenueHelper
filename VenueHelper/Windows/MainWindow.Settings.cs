@@ -1,5 +1,7 @@
 using Dalamud.Interface.Utility;
 
+using VenueHelper.FancyUI;
+
 namespace VenueHelper.Windows;
 
 public partial class MainWindow
@@ -16,19 +18,22 @@ public partial class MainWindow
         ImGui.TextColored(Gold, "Settings");
         ImGuiHelpers.ScaledDummy(4f);
 
-        // Panic / master kill switch.
+        // Panic / master kill switch. v1.5.2.0: kit slide toggle; the label
+        // reads danger-red while panic is on.
         var panic = Config.PanicMode;
-        ImGui.PushStyleColor(ImGuiCol.Text, panic ? new Vector4(1f, 0.4f, 0.4f, 1f) : new Vector4(1f, 1f, 1f, 1f));
-        if (ImGui.Checkbox("PANIC: disable all chat-sending and trade-watching", ref panic))
-        {
-            Config.PanicMode = panic;
-            Plugin.Panic = panic;
-            Config.Save();
-            SetStatus(panic ? "Panic ON \u2014 no chat or trade automation will run." : "Panic off \u2014 automation re-enabled.", panic ? Red : Green);
-        }
-        ImGui.PopStyleColor();
+        var panicNew = UiKit.Toggle("##panic", panic);
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Emergency stop. Halts serve sequences, macros, shout/announce sends, and trade buy-in detection. Reversible \u2014 untick to resume.");
+        ImGui.SameLine(0, Theme.Gap);
+        ImGui.TextColored(panic ? Red : Grey,
+            "PANIC: disable all chat-sending and trade-watching");
+        if (panicNew != panic)
+        {
+            Config.PanicMode = panicNew;
+            Plugin.Panic = panicNew;
+            Config.Save();
+            SetStatus(panicNew ? "Panic ON \u2014 no chat or trade automation will run." : "Panic off \u2014 automation re-enabled.", panicNew ? Red : Green);
+        }
 
         ImGuiHelpers.ScaledDummy(4f);
 

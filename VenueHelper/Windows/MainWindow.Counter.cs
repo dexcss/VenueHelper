@@ -2,6 +2,8 @@ using Dalamud.Interface.Components;
 using Dalamud.Interface.Utility;
 using VenueHelper.Logic;
 
+using VenueHelper.FancyUI;
+
 namespace VenueHelper.Windows;
 
 public partial class MainWindow
@@ -194,10 +196,13 @@ public partial class MainWindow
         // ---- Lifetime time tracking -----------------------------------
         ImGui.TextColored(Blue, "Time in Venue (lifetime)");
         var track = Counter.TrackVisitTime;
-        if (ImGui.Checkbox("Track time while the all-night counter runs", ref track))
-            Counter.TrackVisitTime = track;
+        var trackNew = UiKit.Toggle("##counter-tracktime", track);
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Accumulates total time each visitor has spent in your venue, across nights, while the all-night counter is running.");
+        ImGui.SameLine(0, Theme.Gap);
+        ImGui.TextUnformatted("Track time while the all-night counter runs");
+        if (trackNew != track)
+            Counter.TrackVisitTime = trackNew;
 
         if (!Counter.AllNightRunning && Counter.TrackVisitTime)
             ImGui.TextColored(Grey, "(Start the all-night counter above to accumulate time.)");

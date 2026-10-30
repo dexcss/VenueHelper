@@ -4,6 +4,8 @@ using Dalamud.Interface.Utility;
 using VenueHelper.Data;
 using VenueHelper.Logic;
 
+using VenueHelper.FancyUI;
+
 namespace VenueHelper.Windows;
 
 public partial class MainWindow
@@ -91,7 +93,8 @@ public partial class MainWindow
         ImGuiHelpers.ScaledDummy(4f);
 
         // Mode toggle. In play mode, also show who we're serving to.
-        if (ImGui.Button(menuEditMode ? "\u2190 Done editing" : "Edit menu & buttons"))
+        // v1.5.2.0: active-state chip button instead of a stock button.
+        if (UiKit.ChipButton("##menu-editmode", menuEditMode ? "\u2190 Done editing" : "Edit menu & buttons", menuEditMode))
             menuEditMode = !menuEditMode;
         if (!menuEditMode)
         {
@@ -171,7 +174,10 @@ public partial class MainWindow
                 var serveLabel = "Serve";
                 var qtyLabel = $"x{qty}";
                 var style = ImGui.GetStyle();
-                var btnW = ImGui.CalcTextSize(serveLabel).X + style.FramePadding.X * 2 + SW(8);
+                // v1.5.2.0: Serve is a kit chip (accent when it's the card's
+                // action); width matches the chip's own metric so the
+                // right-aligned group below keeps its math.
+                var btnW = ImGui.CalcTextSize(serveLabel).X + 20f * Theme.UiScale;
                 var stepW = ImGui.CalcTextSize("-").X + style.FramePadding.X * 2 + SW(6);
                 var qtyW = ImGui.CalcTextSize("x99").X + SW(8);
                 var groupW = stepW * 2 + qtyW + btnW + style.ItemSpacing.X * 3;
@@ -192,14 +198,12 @@ public partial class MainWindow
                 ImGui.PopID();
 
                 ImGui.SameLine();
-                ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.2f, 0.4f, 0.25f, 1f));
-                if (ImGui.Button($"{serveLabel}##{i}"))
+                if (UiKit.ChipButton($"##serve{i}", serveLabel, true, btnW))
                 {
                     var (ok, msg) = Menu.Serve(item, menuServeBuyer, qty);
                     SetStatus(msg, ok ? Green : Red);
                     menuServeQty[i] = 1; // reset for the next customer
                 }
-                ImGui.PopStyleColor();
                 if (ImGui.IsItemHovered())
                     ImGui.SetTooltip(
                         (qty > 1 ? $"Serves {qty} \u2014 logs one order for {item.Price * qty:N0} gil.\n\n" : "")
